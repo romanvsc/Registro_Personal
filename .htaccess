@@ -1,0 +1,14 @@
+RewriteEngine On
+
+DirectoryIndex index.html
+
+# Si el archivo o carpeta existe, servirlo normalmente
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Enviar las rutas de API al backend PHP
+RewriteRule ^api(?:/.*)?$ backend/index.php [QSA,L]
+
+# Resto de rutas -> frontend
+RewriteRule ^ index.html [L]
