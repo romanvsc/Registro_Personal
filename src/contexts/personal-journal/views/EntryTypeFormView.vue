@@ -36,6 +36,12 @@ const form = reactive({
 
 const slugTouched = ref(false)
 
+function getErrorMessage(error, fallback) {
+  const message = error instanceof Error ? error.message.trim() : ''
+  if (message && !['undefined', 'null', '[object Object]'].includes(message)) return message
+  return fallback
+}
+
 function suggestSlug() {
   if (slugTouched.value) return
   const normalized = form.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -85,10 +91,16 @@ async function save() {
     } else {
       await createEntryType(payload)
     }
-    pushToast(editingId.value ? 'Tipo actualizado.' : 'Tipo creado.')
+    pushToast({
+      type: 'success',
+      message: editingId.value ? 'Tipo actualizado.' : 'Tipo creado.',
+      duration: 3000,
+    })
     router.push('/configuracion/tipos')
   } catch (error) {
-    formError.value = error instanceof Error ? error.message : 'No se pudo guardar el tipo.'
+    const message = getErrorMessage(error, 'Ocurrió un problema. Intentá nuevamente.')
+    formError.value = message
+    pushToast({ type: 'error', message, duration: 5000 })
   } finally {
     saving.value = false
   }
@@ -118,7 +130,7 @@ onMounted(async () => {
       applyType(await getEntryType(Number(id)))
     }
   } catch (error) {
-    formError.value = error instanceof Error ? error.message : 'No se pudo cargar el tipo.'
+    formError.value = getErrorMessage(error, 'No se pudo cargar el tipo.')
   } finally {
     loading.value = false
   }

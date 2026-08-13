@@ -1,14 +1,31 @@
 <script setup>
+import { computed } from 'vue'
 import { toastStore } from '../application/toastStore'
 import AppIcon from './AppIcon.vue'
+
+const visibleToasts = computed(() => toastStore.toasts.value.filter(toast =>
+  typeof toast.message === 'string' && toast.message.trim() !== '',
+))
+
+function iconFor(type) {
+  if (type === 'error') return 'error'
+  if (type === 'warning') return 'advertencia'
+  return 'exito'
+}
 </script>
 
 <template>
-  <div class="toast-host" aria-live="polite" aria-atomic="false">
-    <div v-for="toast in toastStore.toasts" :key="toast.id" class="toast" :class="`toast--${toast.type}`" role="status">
-      <span class="toast__icon"><AppIcon :name="toast.type === 'error' ? 'error' : 'exito'" /></span>
+  <div v-if="visibleToasts.length" class="toast-host" aria-live="polite" aria-atomic="false">
+    <div
+      v-for="toast in visibleToasts"
+      :key="toast.id"
+      class="toast"
+      :class="`toast--${toast.type}`"
+      :role="toast.type === 'error' ? 'alert' : 'status'"
+    >
+      <span class="toast__icon"><AppIcon :name="iconFor(toast.type)" /></span>
       <p>{{ toast.message }}</p>
-      <button type="button" aria-label="Cerrar aviso" @click="toastStore.dismissToast(toast.id)">×</button>
+      <button class="toast__close" type="button" aria-label="Cerrar aviso" @click="toastStore.dismissToast(toast.id)">×</button>
     </div>
   </div>
 </template>
@@ -16,11 +33,12 @@ import AppIcon from './AppIcon.vue'
 <style scoped>
 .toast-host {
   position: fixed;
+  top: 20px;
   right: 20px;
-  bottom: 20px;
   z-index: 70;
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   gap: 10px;
   width: min(360px, calc(100vw - 40px));
 }
@@ -29,6 +47,7 @@ import AppIcon from './AppIcon.vue'
   display: flex;
   align-items: center;
   gap: 12px;
+  width: 100%;
   padding: 13px 14px;
   border: 1px solid var(--sand-300);
   border-radius: 14px;
@@ -47,9 +66,8 @@ import AppIcon from './AppIcon.vue'
   background: var(--sage-100, #e3efe4);
 }
 
-.toast--error .toast__icon {
-  background: var(--danger-100, #f6ddda);
-}
+.toast--error .toast__icon { background: var(--danger-100, #f6ddda); }
+.toast--warning .toast__icon { background: #fbe9d3; }
 
 .toast p {
   flex: 1;
@@ -59,7 +77,7 @@ import AppIcon from './AppIcon.vue'
   line-height: 1.4;
 }
 
-.toast button {
+.toast__close {
   border: 0;
   background: transparent;
   color: var(--cocoa-500);
@@ -69,7 +87,15 @@ import AppIcon from './AppIcon.vue'
 }
 
 @keyframes toast-in {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 560px) {
+  .toast-host { top: 12px; right: 12px; width: calc(100vw - 24px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
 }
 </style>

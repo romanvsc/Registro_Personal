@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { addEntry, catFor, editEntry, entryTypes, journalError, loadEntry, loadJournal } from '../lib/entries'
+import { pushToast } from '../shared/application/toastStore'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,6 +17,12 @@ const saving = ref(false)
 const loading = ref(false)
 const selectedType = computed(() => entryTypes.value.find(item => item.slug === type.value) || entryTypes.value[0])
 const cat = computed(() => catFor(score.value))
+
+function getErrorMessage(error) {
+  const message = error instanceof Error ? error.message.trim() : ''
+  if (message && !['undefined', 'null', '[object Object]'].includes(message)) return message
+  return 'Ocurrió un problema. Intentá nuevamente.'
+}
 
 function toDatetimeLocal(value) {
   const date = new Date(value)
@@ -89,7 +96,18 @@ async function save() {
     } else {
       await addEntry(payload)
     }
+    pushToast({
+      type: 'success',
+      message: editingId.value ? 'Registro actualizado.' : 'Registro creado.',
+      duration: 3000,
+    })
     router.push('/historial')
+  } catch (error) {
+    pushToast({
+      type: 'error',
+      message: getErrorMessage(error),
+      duration: 5000,
+    })
   } finally {
     saving.value = false
   }

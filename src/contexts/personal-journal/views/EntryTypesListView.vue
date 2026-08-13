@@ -19,6 +19,12 @@ const deleting = ref(null)
 const deletingBusy = ref(false)
 const deleteMessage = ref('')
 
+function getErrorMessage(error, fallback) {
+  const message = error instanceof Error ? error.message.trim() : ''
+  if (message && !['undefined', 'null', '[object Object]'].includes(message)) return message
+  return fallback
+}
+
 function confirmDelete(type) {
   deleting.value = type
   deleteMessage.value = type.active
@@ -31,10 +37,18 @@ async function runDelete() {
   deletingBusy.value = true
   try {
     const result = await deleteEntryType(deleting.value.id)
-    pushToast(result.deactivated ? 'Tipo desactivado.' : 'Tipo eliminado.')
+    pushToast({
+      type: 'success',
+      message: result.deactivated ? 'Tipo desactivado.' : 'Tipo eliminado.',
+      duration: 3000,
+    })
     deleting.value = null
   } catch (error) {
-    pushToast(error instanceof Error ? error.message : 'No se pudo eliminar el tipo.', 'error')
+    pushToast({
+      type: 'error',
+      message: getErrorMessage(error, 'Ocurrió un problema. Intentá nuevamente.'),
+      duration: 5000,
+    })
     deleting.value = null
   } finally {
     deletingBusy.value = false

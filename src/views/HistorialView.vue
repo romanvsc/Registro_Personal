@@ -16,6 +16,7 @@ import {
 import CatScore from '../components/CatScore.vue'
 import AppIcon from '../shared/components/AppIcon.vue'
 import ConfirmDialog from '../shared/components/ConfirmDialog.vue'
+import { pushToast } from '../shared/application/toastStore'
 
 const base = import.meta.env.BASE_URL
 const route = useRoute()
@@ -32,7 +33,9 @@ const form = reactive({
 
 const deleting = ref(null)
 const deletingBusy = ref(false)
-const deleteError = ref('')
+
+const DELETE_ERROR_FALLBACK = 'Ocurrió un problema. Intentá nuevamente.'
+const INVALID_ERROR_MESSAGES = new Set(['undefined', 'null', '[object object]'])
 
 const firstEntryType = computed(() => insightEntryTypes.value[0]?.slug || '')
 
@@ -90,12 +93,22 @@ async function clearFilters() {
 async function confirmDelete() {
   if (deleting.value === null) return
   deletingBusy.value = true
-  deleteError.value = ''
   try {
     await deleteInsightEntry(deleting.value)
     deleting.value = null
+    pushToast({
+      type: 'success',
+      message: 'Registro eliminado correctamente.',
+      duration: 3000,
+    })
   } catch (error) {
-    deleteError.value = error instanceof Error ? error.message : 'No se pudo eliminar el registro.'
+    const rawMessage = error instanceof Error ? error.message : ''
+    const candidate = typeof rawMessage === 'string' ? rawMessage.trim() : ''
+    const message = candidate && !INVALID_ERROR_MESSAGES.has(candidate.toLowerCase())
+      ? candidate
+      : DELETE_ERROR_FALLBACK
+
+    pushToast({ type: 'error', message, duration: 5000 })
   } finally {
     deletingBusy.value = false
   }
@@ -103,7 +116,6 @@ async function confirmDelete() {
 
 function cancelDelete() {
   deleting.value = null
-  deleteError.value = ''
   deletingBusy.value = false
 }
 
@@ -171,7 +183,6 @@ onMounted(async () => {
     </template>
 
     <ConfirmDialog v-if="deleting !== null" title="¿Eliminar este registro?" message="Esta acción no se puede deshacer." confirm-label="Eliminar" :busy="deletingBusy" @confirm="confirmDelete" @cancel="cancelDelete" />
-    <p v-if="deleteError" class="form-error filter-bar-error" role="alert">{{ deleteError }}</p>
   </div>
 </template>
 
