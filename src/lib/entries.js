@@ -7,4 +7,7 @@ export {
   catFor,
   loadJournal,
   addEntry,
+  loadEntry,
+  editEntry,
+  removeEntry,
 } from '../contexts/personal-journal/application/journalStore'

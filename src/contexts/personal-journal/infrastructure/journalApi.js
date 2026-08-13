@@ -22,5 +22,8 @@ function toQuery(params = {}) {
 export const journalApi = {
   listTypes: () => request(`${apiBase}/entry-types`),
   listEntries: (params = {}) => request(`${apiBase}/entries${toQuery(params)}`),
+  getEntry: id => request(`${apiBase}/entries/${id}`),
   createEntry: payload => request(`${apiBase}/entries`, { method: 'POST', body: JSON.stringify(payload) }),
+  updateEntry: (id, payload) => request(`${apiBase}/entries/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  deleteEntry: id => request(`${apiBase}/entries/${id}`, { method: 'DELETE' }),
 }

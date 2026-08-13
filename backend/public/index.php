@@ -2,9 +2,16 @@
 declare(strict_types=1);
 
 use App\PersonalJournal\Application\CreateEntry\CreateEntry;
+use App\PersonalJournal\Application\DeleteEntry\DeleteEntry;
+use App\PersonalJournal\Application\EntryNotFoundException;
+use App\PersonalJournal\Application\GetEntry\GetEntry;
+use App\PersonalJournal\Application\Insights\GetComparison\GetComparison;
+use App\PersonalJournal\Application\Insights\GetSummary\GetSummary;
+use App\PersonalJournal\Application\Insights\GetTrend\GetTrend;
 use App\PersonalJournal\Application\JournalEntryView;
 use App\PersonalJournal\Application\ListEntries\ListEntries;
 use App\PersonalJournal\Application\ListEntryTypes\ListEntryTypes;
+use App\PersonalJournal\Application\UpdateEntry\UpdateEntry;
 use App\PersonalJournal\Infrastructure\Persistence\PdoEntryTypeRepository;
 use App\PersonalJournal\Infrastructure\Persistence\PdoJournalEntryRepository;
 use App\IdentityAccess\Application\CurrentUser\GetCurrentUser;
@@ -27,7 +34,7 @@ if ($corsOrigin !== '') {
     header("Access-Control-Allow-Origin: $corsOrigin");
     header('Access-Control-Allow-Credentials: true');
     header('Access-Control-Allow-Headers: Content-Type, Authorization');
-    header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+    header('Access-Control-Allow-Methods: GET, POST, PATCH, DELETE, OPTIONS');
 }
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
@@ -84,14 +91,35 @@ try {
     if ($path === '/api/entries' && $method === 'GET') {
         $page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
         $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : null;
-        respond((new ListEntries($entries, $types))->execute($userId, $page, $limit));
+        respond((new ListEntries($entries, $types))->execute($userId, $page, $limit, $_GET));
     }
     if ($path === '/api/entries' && $method === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
         $created = (new CreateEntry($entries, $types))->execute($userId, $input);
         respond(['entry' => JournalEntryView::from($created, $types->byId($created->typeId))], 201);
     }
+    if (preg_match('#^/api/entries/(\d+)$#', $path, $matches) === 1) {
+        $entryId = (int) $matches[1];
+        if ($method === 'GET') respond((new GetEntry($entries, $types))->execute($userId, $entryId));
+        if ($method === 'PATCH') {
+            $input = json_decode(file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
+            respond((new UpdateEntry($entries, $types))->execute($userId, $entryId, $input));
+        }
+        if ($method === 'DELETE') respond((new DeleteEntry($entries))->execute($userId, $entryId));
+    }
+    if ($path === '/api/insights/summary' && $method === 'GET') {
+        respond((new GetSummary($entries))->execute($userId, $_GET['from'] ?? null, $_GET['to'] ?? null));
+    }
+    if ($path === '/api/insights/trend' && $method === 'GET') {
+        $days = isset($_GET['days']) ? (int) $_GET['days'] : null;
+        respond((new GetTrend($entries))->execute($userId, $_GET['from'] ?? null, $_GET['to'] ?? null, $days));
+    }
+    if ($path === '/api/insights/comparison' && $method === 'GET') {
+        respond((new GetComparison($entries))->execute($userId, $_GET['from'] ?? null, $_GET['to'] ?? null, $_GET['period'] ?? null));
+    }
     respond(['error' => 'Ruta no encontrada'], 404);
+} catch (EntryNotFoundException $error) {
+    respond(['error' => $error->getMessage()], 404);
 } catch (DomainException $error) {
     respond(['error' => $error->getMessage()], 401);
 } catch (InvalidArgumentException|JsonException $error) {

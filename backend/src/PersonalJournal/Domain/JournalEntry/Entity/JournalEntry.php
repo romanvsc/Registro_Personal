@@ -34,6 +34,16 @@ final readonly class JournalEntry
         return new self($id, $userId, $typeId, $title, $notes, new FeelingScore($score), $values, $occurredAt);
     }
 
+    public function edit(int $typeId, string $title, ?string $notes, int $score, array $values, DateTimeImmutable $occurredAt): self
+    {
+        if ($this->id === null) throw new InvalidArgumentException('No se puede editar un registro sin identidad.');
+        $title = trim($title);
+        if ($typeId < 1) throw new InvalidArgumentException('El tipo es obligatorio.');
+        if ($title === '') throw new InvalidArgumentException('El título es obligatorio.');
+
+        return new self($this->id, $this->userId, $typeId, $title, self::cleanText($notes), new FeelingScore($score), $values, $occurredAt);
+    }
+
     private static function cleanText(?string $value): ?string
     {
         $clean = trim((string) $value);

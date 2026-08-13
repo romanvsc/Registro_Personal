@@ -14,6 +14,7 @@ const router = createRouter({
     { path: '/login', component: LoginView, meta: { publicLayout: true } },
     { path: '/', component: DashboardView },
     { path: '/registrar/:type?', component: RegistroView },
+    { path: '/editar/:id', component: RegistroView },
     { path: '/historial', component: HistorialView },
   ],
 })
