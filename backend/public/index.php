@@ -3,7 +3,12 @@ declare(strict_types=1);
 
 use App\PersonalJournal\Application\CreateEntry\CreateEntry;
 use App\PersonalJournal\Application\DeleteEntry\DeleteEntry;
+use App\PersonalJournal\Application\ConflictException;
 use App\PersonalJournal\Application\EntryNotFoundException;
+use App\PersonalJournal\Application\EntryTypes\CreateEntryType;
+use App\PersonalJournal\Application\EntryTypes\DeleteEntryType;
+use App\PersonalJournal\Application\EntryTypes\GetEntryType;
+use App\PersonalJournal\Application\EntryTypes\UpdateEntryType;
 use App\PersonalJournal\Application\GetEntry\GetEntry;
 use App\PersonalJournal\Application\Insights\GetComparison\GetComparison;
 use App\PersonalJournal\Application\Insights\GetSummary\GetSummary;
@@ -87,7 +92,23 @@ try {
     $authenticated = $currentUser->execute();
     if ($authenticated === null) respond(['error' => 'No autenticado.'], 401);
     $userId = $authenticated['id'];
-    if ($path === '/api/entry-types' && $method === 'GET') respond((new ListEntryTypes($types))->execute());
+    if ($path === '/api/entry-types' && $method === 'GET') {
+        $includeInactive = ($_GET['includeInactive'] ?? '') === '1';
+        respond((new ListEntryTypes($types))->execute($userId, $includeInactive));
+    }
+    if ($path === '/api/entry-types' && $method === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
+        respond((new CreateEntryType($types))->execute($userId, $input), 201);
+    }
+    if (preg_match('#^/api/entry-types/(\d+)$#', $path, $matches) === 1) {
+        $typeId = (int) $matches[1];
+        if ($method === 'GET') respond((new GetEntryType($types))->execute($userId, $typeId));
+        if ($method === 'PATCH') {
+            $input = json_decode(file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
+            respond((new UpdateEntryType($types))->execute($userId, $typeId, $input));
+        }
+        if ($method === 'DELETE') respond((new DeleteEntryType($types, $entries))->execute($userId, $typeId));
+    }
     if ($path === '/api/entries' && $method === 'GET') {
         $page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
         $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : null;
@@ -96,7 +117,8 @@ try {
     if ($path === '/api/entries' && $method === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
         $created = (new CreateEntry($entries, $types))->execute($userId, $input);
-        respond(['entry' => JournalEntryView::from($created, $types->byId($created->typeId))], 201);
+        $createdType = $types->byId($created->typeId, $userId);
+        respond(['entry' => JournalEntryView::from($created, $createdType)], 201);
     }
     if (preg_match('#^/api/entries/(\d+)$#', $path, $matches) === 1) {
         $entryId = (int) $matches[1];
@@ -118,6 +140,8 @@ try {
         respond((new GetComparison($entries))->execute($userId, $_GET['from'] ?? null, $_GET['to'] ?? null, $_GET['period'] ?? null));
     }
     respond(['error' => 'Ruta no encontrada'], 404);
+} catch (ConflictException $error) {
+    respond(['error' => $error->getMessage()], 409);
 } catch (EntryNotFoundException $error) {
     respond(['error' => $error->getMessage()], 404);
 } catch (DomainException $error) {

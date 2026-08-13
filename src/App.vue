@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from './shared/components/AppIcon.vue'
+import ToastHost from './shared/components/ToastHost.vue'
 import { sessionStore } from './contexts/identity-access/application/sessionStore'
 
 const menuOpen = ref(false)
@@ -18,6 +19,7 @@ const links = [
   { to: '/registrar/entrenamiento', label: 'Entrenamientos', icon: 'entrenamientos' },
   { to: '/registrar/animo', label: 'Estado de ánimo', icon: 'estado-animo' },
   { to: '/historial', label: 'Historial', icon: 'historial' },
+  { to: '/configuracion/tipos', label: 'Tipos', icon: 'nuevo-registro' },
 ]
 </script>
 
@@ -46,5 +48,6 @@ const links = [
       </button>
     </aside>
     <main><RouterView /></main>
+    <ToastHost />
   </div>
 </template>

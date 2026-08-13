@@ -7,13 +7,45 @@ use InvalidArgumentException;
 
 final readonly class EntryType
 {
+    /** Contrato de iconos soportados por la presentación (AppIcon + catálogo secundario). */
+    public const ALLOWED_ICONS = [
+        'hoy', 'comidas', 'entrenamientos', 'estado-animo', 'historial',
+        'nuevo-registro', 'saludo',
+        'agua', 'peso', 'objetivos', 'progreso', 'racha', 'record-personal',
+        'sueno', 'exito', 'advertencia', 'error',
+    ];
+
+    public const ALLOWED_INPUT_TYPES = ['text', 'textarea', 'number', 'date', 'time', 'select', 'checkbox'];
+
     public function __construct(
         public int $id,
         public string $slug,
         public string $name,
         public string $icon,
         public array $fields,
+        public bool $isActive = true,
+        public int $sortOrder = 0,
+        public int $userId = 1,
     ) {}
+
+    public static function create(int $userId, string $slug, string $name, string $icon, array $fields = [], bool $isActive = true, int $sortOrder = 0): self
+    {
+        $name = self::validateName($name);
+        $slug = self::validateSlug($slug);
+        self::validateIcon($icon);
+        self::validateSortOrder($sortOrder);
+        return new self(0, $slug, $name, $icon, $fields, $isActive, $sortOrder, $userId);
+    }
+
+    public function deactivate(): self
+    {
+        return new self($this->id, $this->slug, $this->name, $this->icon, $this->fields, false, $this->sortOrder, $this->userId);
+    }
+
+    public function withActive(bool $active): self
+    {
+        return new self($this->id, $this->slug, $this->name, $this->icon, $this->fields, $active, $this->sortOrder, $this->userId);
+    }
 
     /**
      * Valida y normaliza los valores según la definición de campos del tipo.
@@ -47,6 +79,139 @@ final readonly class EntryType
         }
 
         return $validated;
+    }
+
+    /**
+     * Normaliza la definición de campos enviada por el cliente (camelCase) a filas de persistencia (snake_case),
+     * aplicando todas las reglas de dominio de los campos dinámicos.
+     *
+     * @param array<int, array<string, mixed>> $fields
+     * @return array<int, array<string, mixed>>
+     */
+    public static function normalizeFields(array $fields): array
+    {
+        $seenKeys = [];
+        $rows = [];
+        foreach ($fields as $index => $field) {
+            $key = (string) ($field['fieldKey'] ?? '');
+            $label = (string) ($field['label'] ?? '');
+            $inputType = (string) ($field['inputType'] ?? '');
+            $required = (bool) ($field['required'] ?? false);
+            $sortOrder = (int) ($field['sortOrder'] ?? ($index + 1) * 10);
+
+            self::validateFieldKey($key);
+            if (isset($seenKeys[$key])) {
+                throw new InvalidArgumentException("El campo \"{$key}\" está duplicado dentro del tipo.");
+            }
+            $seenKeys[$key] = true;
+
+            $label = trim($label);
+            if ($label === '') {
+                throw new InvalidArgumentException('El label del campo es obligatorio.');
+            }
+            if (mb_strlen($label) > 120) {
+                throw new InvalidArgumentException('El label del campo no puede superar los 120 caracteres.');
+            }
+
+            if (!in_array($inputType, self::ALLOWED_INPUT_TYPES, true)) {
+                throw new InvalidArgumentException("El campo \"{$key}\" tiene un tipo no soportado.");
+            }
+
+            $options = null;
+            if ($inputType === 'select') {
+                $options = self::normalizeOptions($key, is_array($field['options'] ?? null) ? $field['options'] : []);
+            }
+
+            self::validateSortOrder($sortOrder);
+
+            $rows[] = [
+                'field_key' => $key,
+                'label' => $label,
+                'input_type' => $inputType,
+                'is_required' => $required ? 1 : 0,
+                'options_json' => $options !== null ? json_encode($options, JSON_UNESCAPED_UNICODE) : null,
+                'sort_order' => $sortOrder,
+            ];
+        }
+        return $rows;
+    }
+
+    public static function slugify(string $name): string
+    {
+        $normalized = transliterator_transliterate('Any-Latin; Latin-ASCII; Lower()', trim($name)) ?? '';
+        $slug = preg_replace('/[^a-z0-9]+/', '-', strtolower($normalized)) ?? '';
+        return trim($slug, '-');
+    }
+
+    public static function validateName(string $name): string
+    {
+        $name = trim($name);
+        if ($name === '') {
+            throw new InvalidArgumentException('El nombre del tipo es obligatorio.');
+        }
+        if (mb_strlen($name) > 120) {
+            throw new InvalidArgumentException('El nombre del tipo no puede superar los 120 caracteres.');
+        }
+        return $name;
+    }
+
+    public static function validateSlug(string $slug): string
+    {
+        $slug = trim($slug);
+        if ($slug === '') {
+            throw new InvalidArgumentException('El slug del tipo es obligatorio.');
+        }
+        if (!preg_match('/^[a-z0-9][a-z0-9_-]*$/', $slug)) {
+            throw new InvalidArgumentException('El slug solo puede contener minúsculas, números, guiones y guiones bajos.');
+        }
+        if (mb_strlen($slug) > 80) {
+            throw new InvalidArgumentException('El slug no puede superar los 80 caracteres.');
+        }
+        return $slug;
+    }
+
+    public static function validateIcon(string $icon): void
+    {
+        if (!in_array($icon, self::ALLOWED_ICONS, true)) {
+            throw new InvalidArgumentException('El icono del tipo no es válido.');
+        }
+    }
+
+    public static function validateSortOrder(int $sortOrder): void
+    {
+        if ($sortOrder < 0 || $sortOrder > 2147483647) {
+            throw new InvalidArgumentException('El orden debe ser un número entero no negativo.');
+        }
+    }
+
+    private static function validateFieldKey(string $key): void
+    {
+        if ($key === '') {
+            throw new InvalidArgumentException('El fieldKey del campo es obligatorio.');
+        }
+        if (!preg_match('/^[a-z0-9][a-z0-9_]*$/', $key)) {
+            throw new InvalidArgumentException('El fieldKey solo puede contener minúsculas, números y guiones bajos.');
+        }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function normalizeOptions(string $key, array $options): array
+    {
+        $normalized = [];
+        foreach ($options as $option) {
+            $option = trim((string) $option);
+            if ($option === '') {
+                continue;
+            }
+            $normalized[$option] = $option;
+        }
+        $normalized = array_values($normalized);
+        if ($normalized === []) {
+            throw new InvalidArgumentException("El campo \"{$key}\" de tipo select necesita al menos una opción.");
+        }
+        return $normalized;
     }
 
     private function isEmpty(mixed $value): bool

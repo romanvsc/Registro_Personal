@@ -22,6 +22,8 @@ interface JournalEntryRepository
 
     public function countByUser(int $userId, EntryFilters $filters): int;
 
+    public function countByUserAndType(int $userId, int $typeId): int;
+
     /** @return array{total: int, average: float, min: int, max: int} */
     public function summaryForUser(int $userId, ?DateTimeImmutable $from = null, ?DateTimeImmutable $to = null): array;
 

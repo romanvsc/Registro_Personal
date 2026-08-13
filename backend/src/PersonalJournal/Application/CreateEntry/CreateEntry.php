@@ -15,7 +15,7 @@ final readonly class CreateEntry
 
     public function execute(int $userId, array $input): JournalEntry
     {
-        $type = $this->types->bySlug((string) ($input['type'] ?? ''));
+        $type = $this->types->bySlug((string) ($input['type'] ?? ''), $userId);
         if ($type === null) throw new InvalidArgumentException('El tipo de registro no existe o está inactivo.');
         $values = $type->validateValues(is_array($input['values'] ?? null) ? $input['values'] : []);
         $occurredAt = isset($input['occurredAt']) ? new DateTimeImmutable((string) $input['occurredAt']) : null;

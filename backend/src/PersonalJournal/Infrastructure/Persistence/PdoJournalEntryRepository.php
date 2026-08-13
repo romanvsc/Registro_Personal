@@ -76,6 +76,13 @@ final readonly class PdoJournalEntryRepository implements JournalEntryRepository
         return (int) $stmt->fetchColumn();
     }
 
+    public function countByUserAndType(int $userId, int $typeId): int
+    {
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM journal_entries WHERE user_id = ? AND entry_type_id = ?');
+        $stmt->execute([$userId, $typeId]);
+        return (int) $stmt->fetchColumn();
+    }
+
     public function summaryForUser(int $userId, ?DateTimeImmutable $from = null, ?DateTimeImmutable $to = null): array
     {
         [$where, $params] = $this->userRangeWhere($userId, $from, $to);

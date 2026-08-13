@@ -4,6 +4,8 @@ import App from './App.vue'
 import DashboardView from './views/DashboardView.vue'
 import RegistroView from './views/RegistroView.vue'
 import HistorialView from './views/HistorialView.vue'
+import EntryTypesListView from './contexts/personal-journal/views/EntryTypesListView.vue'
+import EntryTypeFormView from './contexts/personal-journal/views/EntryTypeFormView.vue'
 import LoginView from './contexts/identity-access/views/LoginView.vue'
 import { sessionStore } from './contexts/identity-access/application/sessionStore'
 import './styles.css'
@@ -16,6 +18,8 @@ const router = createRouter({
     { path: '/registrar/:type?', component: RegistroView },
     { path: '/editar/:id', component: RegistroView },
     { path: '/historial', component: HistorialView },
+    { path: '/configuracion/tipos', component: EntryTypesListView },
+    { path: '/configuracion/tipos/:id', component: EntryTypeFormView },
   ],
 })
 

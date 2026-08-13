@@ -20,7 +20,7 @@ final readonly class GetEntry
             throw new \App\PersonalJournal\Application\EntryNotFoundException('Registro no encontrado.');
         }
         return [
-            'entry' => \App\PersonalJournal\Application\JournalEntryView::from($entry, $this->types->byId($entry->typeId)),
+            'entry' => \App\PersonalJournal\Application\JournalEntryView::from($entry, $this->types->byId($entry->typeId, $userId)),
         ];
     }
 }

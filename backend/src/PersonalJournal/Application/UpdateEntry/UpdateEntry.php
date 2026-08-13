@@ -24,7 +24,7 @@ final readonly class UpdateEntry
             throw new EntryNotFoundException('Registro no encontrado.');
         }
 
-        $type = $this->types->bySlug((string) ($input['type'] ?? ''));
+        $type = $this->types->bySlug((string) ($input['type'] ?? ''), $userId);
         if ($type === null) {
             throw new InvalidArgumentException('El tipo de registro no existe o está inactivo.');
         }

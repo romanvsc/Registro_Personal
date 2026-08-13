@@ -79,6 +79,11 @@ final class InMemoryJournalRepository implements JournalEntryRepository
         return count(array_filter($this->rows, static fn (array $row) => $row['userId'] === $userId));
     }
 
+    public function countByUserAndType(int $userId, int $typeId): int
+    {
+        return count(array_filter($this->rows, static fn (array $row) => $row['userId'] === $userId && $row['typeId'] === $typeId));
+    }
+
     public function summaryForUser(int $userId, ?DateTimeImmutable $from = null, ?DateTimeImmutable $to = null): array
     {
         $rows = $this->entriesOf($userId, $from, $to);
@@ -181,9 +186,36 @@ final class InMemoryEntryTypeRepository implements EntryTypeRepository
         }
     }
 
-    public function active(): array { return array_values($this->byId); }
-    public function bySlug(string $slug): ?EntryType { return $this->bySlug[$slug] ?? null; }
-    public function byId(int $id): ?EntryType { return $this->byId[$id] ?? null; }
+    public function active(int $userId): array { return array_values(array_filter($this->byId, static fn ($t) => $t->isActive)); }
+    public function all(int $userId): array { return array_values($this->byId); }
+    public function bySlug(string $slug, int $userId): ?EntryType
+    {
+        $type = $this->bySlug[$slug] ?? null;
+        return $type !== null && $type->isActive ? $type : null;
+    }
+    public function byId(int $id, int $userId): ?EntryType { return $this->byId[$id] ?? null; }
+    public function save(EntryType $type): EntryType { return $type; }
+    public function deactivate(int $id, int $userId): bool
+    {
+        $type = $this->byId[$id] ?? null;
+        if ($type === null) return false;
+        $this->byId[$id] = $type->deactivate();
+        $this->bySlug[$type->slug] = $this->byId[$id];
+        return true;
+    }
+    public function delete(int $id, int $userId): bool
+    {
+        if (!isset($this->byId[$id])) return false;
+        unset($this->byId[$id]);
+        return true;
+    }
+    public function slugExists(string $slug, int $excludeId, int $userId): bool
+    {
+        foreach ($this->byId as $id => $type) {
+            if ($id !== $excludeId && $type->slug === $slug) return true;
+        }
+        return false;
+    }
 }
 
 function type(string $slug, string $name, array $fields = []): EntryType

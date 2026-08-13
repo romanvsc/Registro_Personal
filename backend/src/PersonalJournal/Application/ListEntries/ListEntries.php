@@ -29,10 +29,10 @@ final readonly class ListEntries
             throw new InvalidArgumentException("El límite debe estar entre 1 y {$this->maxLimit}.");
         }
 
-        $filters = $this->filtersFromQuery($query);
+        $filters = $this->filtersFromQuery($userId, $query);
 
         $types = [];
-        foreach ($this->types->active() as $type) $types[$type->id] = $type;
+        foreach ($this->types->all($userId) as $type) $types[$type->id] = $type;
 
         $total = $this->entries->countByUser($userId, $filters);
         $offset = ($page - 1) * $limit;
@@ -50,9 +50,9 @@ final readonly class ListEntries
         ];
     }
 
-    private function filtersFromQuery(array $query): EntryFilters
+    private function filtersFromQuery(int $userId, array $query): EntryFilters
     {
-        $slug = $this->normalizeType($query['type'] ?? null);
+        $slug = $this->normalizeType($userId, $query['type'] ?? null);
         $from = $this->parseDate($query['from'] ?? null, 'desde');
         $to = $this->parseDate($query['to'] ?? null, 'hasta');
         if ($from !== null && $to !== null && $from > $to) {
@@ -75,12 +75,12 @@ final readonly class ListEntries
         );
     }
 
-    private function normalizeType(mixed $value): ?string
+    private function normalizeType(int $userId, mixed $value): ?string
     {
         if ($value === null || $value === '') return null;
         $candidate = trim((string) $value);
         $known = [];
-        foreach ($this->types->active() as $type) $known[$type->slug] = true;
+        foreach ($this->types->active($userId) as $type) $known[$type->slug] = true;
         if (!isset($known[$candidate])) {
             throw new InvalidArgumentException('El tipo de registro no es válido o está inactivo.');
         }

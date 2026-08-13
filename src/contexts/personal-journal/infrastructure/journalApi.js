@@ -1,6 +1,7 @@
 async function request(path, options = {}) {
   const response = await fetch(path, {
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    credentials: 'include',
     ...options,
   })
   const body = await response.json().catch(() => ({}))
@@ -20,7 +21,11 @@ function toQuery(params = {}) {
 }
 
 export const journalApi = {
-  listTypes: () => request(`${apiBase}/entry-types`),
+  listTypes: (includeInactive = false) => request(`${apiBase}/entry-types${includeInactive ? '?includeInactive=1' : ''}`),
+  getType: id => request(`${apiBase}/entry-types/${id}`),
+  createType: payload => request(`${apiBase}/entry-types`, { method: 'POST', body: JSON.stringify(payload) }),
+  updateType: (id, payload) => request(`${apiBase}/entry-types/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  deleteType: id => request(`${apiBase}/entry-types/${id}`, { method: 'DELETE' }),
   listEntries: (params = {}) => request(`${apiBase}/entries${toQuery(params)}`),
   getEntry: id => request(`${apiBase}/entries/${id}`),
   createEntry: payload => request(`${apiBase}/entries`, { method: 'POST', body: JSON.stringify(payload) }),

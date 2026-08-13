@@ -27,6 +27,7 @@ final class FakeListRepository implements JournalEntryRepository
     public function byIdForUser(int $id, int $userId): ?JournalEntry { return null; }
     public function byPage(int $userId, EntryFilters $filters, int $limit, int $offset): array { return []; }
     public function countByUser(int $userId, EntryFilters $filters): int { return 0; }
+    public function countByUserAndType(int $userId, int $typeId): int { return 0; }
     public function summaryForUser(int $userId, ?DateTimeImmutable $from = null, ?DateTimeImmutable $to = null): array { return ['total' => 0, 'average' => 0.0, 'min' => 0, 'max' => 0]; }
     public function breakdownByType(int $userId, ?DateTimeImmutable $from = null, ?DateTimeImmutable $to = null): array { return []; }
     public function trendForPeriod(int $userId, DateTimeImmutable $from, DateTimeImmutable $to): array { return []; }
@@ -36,9 +37,14 @@ final class FakeListRepository implements JournalEntryRepository
 final class FakeTypeRepository implements EntryTypeRepository
 {
     public function __construct(private EntryType $type) {}
-    public function active(): array { return [$this->type]; }
-    public function bySlug(string $slug): ?EntryType { return $slug === $this->type->slug ? $this->type : null; }
-    public function byId(int $id): ?EntryType { return $id === $this->type->id ? $this->type : null; }
+    public function active(int $userId): array { return [$this->type]; }
+    public function all(int $userId): array { return [$this->type]; }
+    public function bySlug(string $slug, int $userId): ?EntryType { return $slug === $this->type->slug ? $this->type : null; }
+    public function byId(int $id, int $userId): ?EntryType { return $id === $this->type->id ? $this->type : null; }
+    public function save(EntryType $type): EntryType { return $type; }
+    public function deactivate(int $id, int $userId): bool { return true; }
+    public function delete(int $id, int $userId): bool { return true; }
+    public function slugExists(string $slug, int $excludeId, int $userId): bool { return false; }
 }
 
 function expectInvalid(callable $fn): void

@@ -30,6 +30,7 @@ final class InsightsInMemoryRepository implements JournalEntryRepository
     public function byIdForUser(int $id, int $userId): ?JournalEntry { return null; }
     public function byPage(int $userId, EntryFilters $filters, int $limit, int $offset): array { return []; }
     public function countByUser(int $userId, EntryFilters $filters): int { return 0; }
+    public function countByUserAndType(int $userId, int $typeId): int { return 0; }
 
     public function summaryForUser(int $userId, ?DateTimeImmutable $from = null, ?DateTimeImmutable $to = null): array
     {

@@ -1,6 +1,7 @@
 async function request(path, signal) {
   const response = await fetch(path, {
     headers: { Accept: 'application/json' },
+    credentials: 'include',
     signal,
   })
   const body = await response.json().catch(() => null)

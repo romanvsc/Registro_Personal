@@ -40,7 +40,11 @@ async function prefillFromEntry(entry) {
   occurredAt.value = toDatetimeLocal(entry.occurredAt) || toDatetimeLocal(new Date())
   Object.keys(values).forEach(key => delete values[key])
   if (entry.values && typeof entry.values === 'object') {
-    Object.assign(values, entry.values)
+    const typeDefinition = entryTypes.value.find(item => item.slug === entry.type)
+    const knownKeys = new Set((typeDefinition?.fields || []).map(field => field.key))
+    Object.entries(entry.values).forEach(([key, value]) => {
+      if (knownKeys.has(key)) values[key] = value
+    })
   }
 }
 
