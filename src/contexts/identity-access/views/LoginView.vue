@@ -111,8 +111,7 @@ async function submit() {
           <img :src="base + 'icons/nuevo-registro.svg'" alt="" aria-hidden="true" /> Crear cuenta
         </button>
 
-        <p class="demo-access">Demo: <strong>demo@registro.local</strong> · <strong>DemoRegistro2026!</strong></p>
-      </div>
+        </div>
     </section>
   </div>
 </template>
@@ -173,7 +172,6 @@ form > label, .password-row label { display: block; color: var(--cocoa-900); fon
 .signup-prompt { margin: 0 0 18px; color: var(--cocoa-500); text-align: center; }
 .signup-button { display: flex; align-items: center; justify-content: center; gap: 12px; border: 1px solid var(--dorito-400); color: var(--dorito-600); background: transparent; font-size: 17px; }
 .signup-button img { width: 34px; height: 34px; object-fit: contain; }
-.demo-access { margin: 22px 0 0; color: var(--cocoa-500); font-size: 11px; text-align: center; }
 
 @media (max-width: 1050px) {
   .login-page { grid-template-columns: 42% 58%; }.login-story { padding-inline: 24px; }.cat-intros { grid-template-columns: 1fr; max-width: 260px; }.cat-intros article { min-height: 72px; }.cats-portrait { margin-top: 38px; }.login-card { padding-inline: 48px; }

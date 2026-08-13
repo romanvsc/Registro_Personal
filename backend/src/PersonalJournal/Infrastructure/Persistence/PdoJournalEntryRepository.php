@@ -19,13 +19,23 @@ final readonly class PdoJournalEntryRepository implements JournalEntryRepository
         return JournalEntry::reconstitute((int) $this->pdo->lastInsertId(), $entry->userId, $entry->typeId, $entry->title, $entry->notes, $entry->feelingScore->value, $entry->values, $entry->occurredAt);
     }
 
-    public function byUser(int $userId): array
+    public function byPage(int $userId, int $limit, int $offset): array
     {
-        $stmt = $this->pdo->prepare('SELECT * FROM journal_entries WHERE user_id = ? ORDER BY occurred_at DESC, id DESC');
-        $stmt->execute([$userId]);
+        $stmt = $this->pdo->prepare('SELECT * FROM journal_entries WHERE user_id = ? ORDER BY occurred_at DESC, id DESC LIMIT ? OFFSET ?');
+        $stmt->bindValue(1, $userId, PDO::PARAM_INT);
+        $stmt->bindValue(2, $limit, PDO::PARAM_INT);
+        $stmt->bindValue(3, $offset, PDO::PARAM_INT);
+        $stmt->execute();
         return array_map(static fn (array $row) => JournalEntry::reconstitute(
             (int) $row['id'], (int) $row['user_id'], (int) $row['entry_type_id'], $row['title'], $row['notes'],
             (int) $row['feeling_score'], json_decode($row['values_json'] ?: '{}', true), new DateTimeImmutable($row['occurred_at'])
         ), $stmt->fetchAll());
+    }
+
+    public function countByUser(int $userId): int
+    {
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM journal_entries WHERE user_id = ?');
+        $stmt->execute([$userId]);
+        return (int) $stmt->fetchColumn();
     }
 }

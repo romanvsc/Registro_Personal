@@ -10,8 +10,17 @@ async function request(path, options = {}) {
 
 const apiBase = `${import.meta.env.BASE_URL}api`
 
+function toQuery(params = {}) {
+  const search = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) search.set(key, String(value))
+  })
+  const qs = search.toString()
+  return qs ? `?${qs}` : ''
+}
+
 export const journalApi = {
   listTypes: () => request(`${apiBase}/entry-types`),
-  listEntries: () => request(`${apiBase}/entries`),
+  listEntries: (params = {}) => request(`${apiBase}/entries${toQuery(params)}`),
   createEntry: payload => request(`${apiBase}/entries`, { method: 'POST', body: JSON.stringify(payload) }),
 }

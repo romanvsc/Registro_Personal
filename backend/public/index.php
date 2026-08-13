@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 use App\PersonalJournal\Application\CreateEntry\CreateEntry;
+use App\PersonalJournal\Application\JournalEntryView;
 use App\PersonalJournal\Application\ListEntries\ListEntries;
 use App\PersonalJournal\Application\ListEntryTypes\ListEntryTypes;
 use App\PersonalJournal\Infrastructure\Persistence\PdoEntryTypeRepository;
@@ -21,10 +22,13 @@ spl_autoload_register(static function (string $class): void {
 });
 
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: http://localhost:5173');
-header('Access-Control-Allow-Credentials: true');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+$corsOrigin = getenv('CORS_ORIGIN') ?: '';
+if ($corsOrigin !== '') {
+    header("Access-Control-Allow-Origin: $corsOrigin");
+    header('Access-Control-Allow-Credentials: true');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization');
+    header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+}
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
 function respond(mixed $body, int $status = 200): never {
@@ -35,12 +39,11 @@ function respond(mixed $body, int $status = 200): never {
 
 try {
     $configFile = dirname(__DIR__) . '/config.php';
-    $config = is_file($configFile) ? require $configFile : [
-        'dsn' => getenv('DB_DSN') ?: 'mysql:host=127.0.0.1;port=3306;dbname=registro_personal;charset=utf8mb4',
-        'user' => getenv('DB_USER') ?: 'root',
-        'password' => getenv('DB_PASSWORD') ?: '',
-    ];
-    $pdo = new PDO($config['dsn'], $config['user'], $config['password'], [
+    $fileConfig = is_file($configFile) ? require $configFile : [];
+    $dsn = getenv('DB_DSN') ?: ($fileConfig['dsn'] ?? 'mysql:host=127.0.0.1;port=3306;dbname=registro_personal;charset=utf8mb4');
+    $user = getenv('DB_USER') ?: ($fileConfig['user'] ?? 'root');
+    $password = getenv('DB_PASSWORD') ?: ($fileConfig['password'] ?? '');
+    $pdo = new PDO($dsn, $user, $password, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false,
@@ -78,11 +81,15 @@ try {
     if ($authenticated === null) respond(['error' => 'No autenticado.'], 401);
     $userId = $authenticated['id'];
     if ($path === '/api/entry-types' && $method === 'GET') respond((new ListEntryTypes($types))->execute());
-    if ($path === '/api/entries' && $method === 'GET') respond((new ListEntries($entries, $types))->execute($userId));
+    if ($path === '/api/entries' && $method === 'GET') {
+        $page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
+        $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : null;
+        respond((new ListEntries($entries, $types))->execute($userId, $page, $limit));
+    }
     if ($path === '/api/entries' && $method === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
         $created = (new CreateEntry($entries, $types))->execute($userId, $input);
-        respond(['id' => $created->id], 201);
+        respond(['entry' => JournalEntryView::from($created, $types->byId($created->typeId))], 201);
     }
     respond(['error' => 'Ruta no encontrada'], 404);
 } catch (DomainException $error) {

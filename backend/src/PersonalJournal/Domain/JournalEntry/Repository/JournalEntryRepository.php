@@ -8,6 +8,9 @@ use App\PersonalJournal\Domain\JournalEntry\Entity\JournalEntry;
 interface JournalEntryRepository
 {
     public function save(JournalEntry $entry): JournalEntry;
+
     /** @return JournalEntry[] */
-    public function byUser(int $userId): array;
+    public function byPage(int $userId, int $limit, int $offset): array;
+
+    public function countByUser(int $userId): int;
 }

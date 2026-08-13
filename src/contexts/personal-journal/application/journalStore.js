@@ -18,9 +18,9 @@ export async function loadJournal() {
   journalLoading.value = true
   journalError.value = ''
   try {
-    const [types, records] = await Promise.all([journalApi.listTypes(), journalApi.listEntries()])
+    const [types, records] = await Promise.all([journalApi.listTypes(), journalApi.listEntries({ page: 1, limit: 30 })])
     entryTypes.value = types
-    entries.value = records
+    entries.value = records.items
   } catch (error) {
     journalError.value = error.message
   } finally {
@@ -31,8 +31,12 @@ export async function loadJournal() {
 export async function addEntry(entry) {
   journalError.value = ''
   try {
-    await journalApi.createEntry(entry)
-    entries.value = await journalApi.listEntries()
+    const created = await journalApi.createEntry(entry)
+    if (created.entry) {
+      entries.value = [created.entry, ...entries.value]
+    } else {
+      entries.value = await journalApi.listEntries({ page: 1, limit: 30 }).then(r => r.items)
+    }
   } catch (error) {
     journalError.value = error.message
     throw error

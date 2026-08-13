@@ -3,5 +3,9 @@ dist/
 backend/config.php
 backend/data/
 .env
+.env.local
+deploy/
 backend/data/*.sqlite
 backend/data/*.sqlite-*
+deploy/backend/config.php
+*.local

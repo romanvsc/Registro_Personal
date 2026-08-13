@@ -13,8 +13,7 @@ final readonly class PdoEntryTypeRepository implements EntryTypeRepository
 
     public function active(): array
     {
-        $rows = $this->pdo->query('SELECT * FROM entry_types WHERE is_active = 1 ORDER BY sort_order, name')->fetchAll();
-        return array_map(fn (array $row) => $this->hydrate($row), $rows);
+        return $this->hydrateAll($this->pdo->query('SELECT * FROM entry_types WHERE is_active = 1 ORDER BY sort_order, name')->fetchAll());
     }
 
     public function bySlug(string $slug): ?EntryType
@@ -22,7 +21,7 @@ final readonly class PdoEntryTypeRepository implements EntryTypeRepository
         $stmt = $this->pdo->prepare('SELECT * FROM entry_types WHERE slug = ? AND is_active = 1');
         $stmt->execute([$slug]);
         $row = $stmt->fetch();
-        return $row ? $this->hydrate($row) : null;
+        return $row ? $this->hydrateAll([$row])[0] : null;
     }
 
     public function byId(int $id): ?EntryType
@@ -30,13 +29,33 @@ final readonly class PdoEntryTypeRepository implements EntryTypeRepository
         $stmt = $this->pdo->prepare('SELECT * FROM entry_types WHERE id = ? AND is_active = 1');
         $stmt->execute([$id]);
         $row = $stmt->fetch();
-        return $row ? $this->hydrate($row) : null;
+        return $row ? $this->hydrateAll([$row])[0] : null;
     }
 
-    private function hydrate(array $row): EntryType
+    /**
+     * Construye los agregados con una única consulta adicional de campos,
+     * eliminando el patrón N+1.
+     *
+     * @param array<int, array<string, mixed>> $rows
+     * @return EntryType[]
+     */
+    private function hydrateAll(array $rows): array
     {
-        $stmt = $this->pdo->prepare('SELECT * FROM entry_type_fields WHERE entry_type_id = ? ORDER BY sort_order, id');
-        $stmt->execute([(int) $row['id']]);
-        return new EntryType((int) $row['id'], $row['slug'], $row['name'], $row['icon'], $stmt->fetchAll());
+        if ($rows === []) return [];
+
+        $ids = array_map(static fn (array $row) => (int) $row['id'], $rows);
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $this->pdo->prepare("SELECT * FROM entry_type_fields WHERE entry_type_id IN ($placeholders) ORDER BY sort_order, id");
+        $stmt->execute($ids);
+
+        $fieldsByType = [];
+        foreach ($stmt->fetchAll() as $field) {
+            $fieldsByType[(int) $field['entry_type_id']][] = $field;
+        }
+
+        return array_map(static fn (array $row) => new EntryType(
+            (int) $row['id'], $row['slug'], $row['name'], $row['icon'],
+            $fieldsByType[(int) $row['id']] ?? [],
+        ), $rows);
     }
 }

@@ -1,10 +1,12 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import {
+  hasMoreInsights,
   insightEntries,
   insightEntryTypes,
   insightsError,
   insightsLoading,
+  loadMoreInsights,
   loadPersonalInsights,
 } from '../contexts/personal-insights/application/insightsStore'
 import CatScore from '../components/CatScore.vue'
@@ -32,6 +34,7 @@ onMounted(loadPersonalInsights)
       <div class="filters"><button :class="{ active: filter === 'todos' }" @click="filter = 'todos'">Todos</button><button v-for="item in insightEntryTypes" :key="item.slug" :class="{ active: filter === item.slug }" @click="filter = item.slug">{{ item.name }}</button></div>
       <div v-if="filtered.length" class="history-grid"><article v-for="entry in filtered" :key="entry.id"><CatScore :score="entry.score" size="lg" /><div><span>{{ entry.typeName }} · {{ entry.time }}</span><h2>{{ entry.title }}</h2><p>{{ entry.detail || 'Sin notas' }}</p></div><b>{{ entry.score }}/10</b></article></div>
       <div v-else class="entry-list-empty"><img :src="base + 'cats/felipa-molesta.png'" alt="" /><div><h3>Sin registros todavía</h3><p>{{ filter === 'todos' ? 'Felipa te espera para registrar el primer momento.' : 'No hay registros de este tipo.' }}</p></div></div>
+      <button v-if="hasMoreInsights" class="primary-button load-more" type="button" @click="loadMoreInsights" :disabled="insightsLoading">{{ insightsLoading ? 'Cargando…' : 'Cargar más' }}</button>
     </template>
   </div>
 </template>
