@@ -10,6 +10,7 @@ import LoginView from './contexts/identity-access/views/LoginView.vue'
 import RegisterView from './contexts/identity-access/views/RegisterView.vue'
 import ForgotPasswordView from './contexts/identity-access/views/ForgotPasswordView.vue'
 import ResetPasswordView from './contexts/identity-access/views/ResetPasswordView.vue'
+import ProfileView from './contexts/identity-access/views/ProfileView.vue'
 import { sessionStore } from './contexts/identity-access/application/sessionStore'
 import './styles.css'
 
@@ -20,6 +21,7 @@ const router = createRouter({
     { path: '/registro', component: RegisterView, meta: { publicLayout: true } },
     { path: '/recuperar-contrasena', component: ForgotPasswordView, meta: { publicLayout: true } },
     { path: '/restablecer-contrasena', component: ResetPasswordView, meta: { publicLayout: true } },
+    { path: '/perfil', component: ProfileView },
     { path: '/', component: DashboardView },
     { path: '/registrar/:type?', component: RegistroView },
     { path: '/editar/:id', component: RegistroView },

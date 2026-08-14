@@ -10,9 +10,17 @@ import {
   loadingTrend,
   summaryError,
   trendError,
+  wellbeingStreak,
+  wellbeingProgress,
+  loadingWellbeingStreak,
+  loadingWellbeingProgress,
+  wellbeingStreakError,
+  wellbeingProgressError,
   loadInsightSummary,
   loadInsightTrend,
   loadInsightComparison,
+  loadWellbeingStreak,
+  loadWellbeingProgress,
 } from '../contexts/personal-insights/application/insightsStore'
 import { sessionStore } from '../contexts/identity-access/application/sessionStore'
 import { journalApi } from '../contexts/personal-journal/infrastructure/journalApi'
@@ -84,16 +92,34 @@ onMounted(async () => {
   loadInsightSummary()
   loadInsightTrend({ days: 30 })
   loadInsightComparison({ period: 'month' })
+  loadWellbeingStreak()
+  loadWellbeingProgress()
   loadJournal()
   loadRecent()
 })
 
-const wellbeing = [
-  { icon: 'agua', label: 'Agua', value: '—', detail: 'Sin registros', tone: 'info' },
-  { icon: 'racha', label: 'Racha', value: '—', detail: 'Sin registros', tone: 'orange' },
-  { icon: 'progreso', label: 'Progreso', value: '—', detail: 'Sin registros', tone: 'success' },
-  { icon: 'sueno', label: 'Sueño', value: '—', detail: 'Sin registros', tone: 'olive' },
-]
+const wellbeing = computed(() => [
+  {
+    icon: 'racha',
+    label: 'Racha',
+    value: wellbeingStreak.value.value,
+    detail: wellbeingStreakError.value ? 'No pudimos calcularla' : wellbeingStreak.value.detail,
+    tone: 'orange',
+    loading: loadingWellbeingStreak.value,
+    error: wellbeingStreakError.value,
+    retry: loadWellbeingStreak,
+  },
+  {
+    icon: 'progreso',
+    label: 'Progreso semanal',
+    value: wellbeingProgress.value.value,
+    detail: wellbeingProgressError.value ? 'No pudimos calcularlo' : wellbeingProgress.value.detail,
+    tone: wellbeingProgress.value.direction === 'down' ? 'orange' : 'success',
+    loading: loadingWellbeingProgress.value,
+    error: wellbeingProgressError.value,
+    retry: loadWellbeingProgress,
+  },
+])
 </script>
 
 <template>
@@ -162,7 +188,24 @@ const wellbeing = [
 
     <section class="wellbeing-section">
       <div class="section-heading"><div><p class="eyebrow">UN VISTAZO</p><h2>Tu bienestar</h2></div></div>
-      <div class="wellbeing-grid"><article v-for="item in wellbeing" :key="item.label" :class="item.tone"><span><AppIcon :name="item.icon" /></span><div><small>{{ item.label }}</small><strong>{{ item.value }}</strong><p>{{ item.detail }}</p></div></article></div>
+      <div class="wellbeing-grid" aria-live="polite">
+        <article v-for="item in wellbeing" :key="item.label" :class="item.tone" :aria-busy="item.loading">
+          <span><AppIcon :name="item.icon" /></span>
+          <div>
+            <small>{{ item.label }}</small>
+            <template v-if="item.loading">
+              <i class="skeleton wellbeing-card__value" aria-hidden="true"></i>
+              <i class="skeleton wellbeing-card__detail" aria-hidden="true"></i>
+              <span class="visually-hidden">Calculando {{ item.label.toLowerCase() }}…</span>
+            </template>
+            <template v-else>
+              <strong>{{ item.value }}</strong>
+              <p>{{ item.detail }}</p>
+              <button v-if="item.error" type="button" @click="item.retry">Reintentar</button>
+            </template>
+          </div>
+        </article>
+      </div>
     </section>
 
     <section><div class="section-heading"><div><p class="eyebrow">ASÍ VIENE EL DÍA</p><h2>Registros recientes</h2></div><RouterLink to="/historial">Ver todos</RouterLink></div>
@@ -380,6 +423,36 @@ const wellbeing = [
   min-height: 104px;
   padding: 19px 16px;
 }
+
+.wellbeing-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.wellbeing-grid article > div {
+  min-width: 0;
+}
+
+.wellbeing-grid article button {
+  min-height: 32px;
+  margin-top: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--dorito-300);
+  border-radius: 9px;
+  color: var(--dorito-700);
+  background: var(--dorito-50);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.wellbeing-grid article button:hover,
+.wellbeing-grid article button:focus-visible {
+  border-color: var(--dorito-500);
+  background: var(--dorito-100);
+}
+
+.wellbeing-card__value { width: 72px; height: 22px; margin: 6px 0; }
+.wellbeing-card__detail { width: min(160px, 90%); height: 11px; }
 
 .entry-list article span,
 .entry-list article p,

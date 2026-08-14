@@ -28,6 +28,9 @@ use App\IdentityAccess\Application\Register\Register;
 use App\IdentityAccess\Application\Register\RegistrationValidationException;
 use App\IdentityAccess\Application\ResetPassword\InvalidResetToken;
 use App\IdentityAccess\Application\ResetPassword\ResetPassword;
+use App\IdentityAccess\Application\UpdateProfile\CurrentPasswordInvalid;
+use App\IdentityAccess\Application\UpdateProfile\ProfileValidationException;
+use App\IdentityAccess\Application\UpdateProfile\UpdateProfile;
 use App\IdentityAccess\Domain\User\Exception\EmailAlreadyExists;
 use App\IdentityAccess\Infrastructure\Integration\PersonalJournalInitialEntryTypesProvisioner;
 use App\IdentityAccess\Infrastructure\Persistence\PdoUserRepository;
@@ -147,6 +150,19 @@ try {
         if ($user === null) respond(['error' => 'No autenticado.'], 401);
         respond(['user' => $user]);
     }
+    if ($path === '/api/auth/profile' && $method === 'PATCH') {
+        $input = json_decode(file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
+        if (!is_array($input)) throw new ProfileValidationException('El formulario de perfil es inválido.');
+        $profile = (new UpdateProfile($users, new NativePasswordVerifier(), new NativePasswordHasher(), $sessions))->execute(
+            (string)($input['name'] ?? ''),
+            array_key_exists('avatarKey', $input) && $input['avatarKey'] !== null ? (string)$input['avatarKey'] : null,
+            (string)($input['biography'] ?? ''),
+            (string)($input['currentPassword'] ?? ''),
+            (string)($input['password'] ?? ''),
+            (string)($input['passwordConfirmation'] ?? ''),
+        );
+        respond(['user' => $profile]);
+    }
     if ($path === '/api/auth/logout' && $method === 'POST') {
         (new Logout($sessions))->execute();
         respond(['status' => 'ok']);
@@ -211,6 +227,10 @@ try {
     respond(['error' => ['code' => EmailAlreadyExists::ERROR_CODE, 'message' => $error->getMessage()]], 409);
 } catch (RegistrationValidationException $error) {
     respond(['error' => ['code' => RegistrationValidationException::ERROR_CODE, 'message' => $error->getMessage()]], 422);
+} catch (CurrentPasswordInvalid $error) {
+    respond(['error' => ['code' => CurrentPasswordInvalid::ERROR_CODE, 'message' => $error->getMessage()]], 422);
+} catch (ProfileValidationException $error) {
+    respond(['error' => ['code' => ProfileValidationException::ERROR_CODE, 'message' => $error->getMessage()]], 422);
 } catch (ConflictException $error) {
     respond(['error' => $error->getMessage()], 409);
 } catch (EntryNotFoundException $error) {

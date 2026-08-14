@@ -112,6 +112,8 @@ CREATE TABLE `users` (
   `email` varchar(190) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `avatar_key` varchar(40) DEFAULT NULL,
+  `biography` varchar(500) NOT NULL DEFAULT '',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -120,8 +122,8 @@ CREATE TABLE `users` (
 -- Volcado de datos para la tabla `users`
 --
 
-INSERT INTO `users` (`id`, `name`, `email`, `password_hash`, `is_active`, `created_at`, `updated_at`) VALUES
-(1, 'Usuario Demo', 'demo@registro.local', '$2y$10$dV2gAYqWsHaF1uTzXe0NH.RlL7cy9e8l38OyVHLAYqgezpoDgSpNG', 1, '2026-08-09 23:08:22', '2026-08-09 23:08:22');
+INSERT INTO `users` (`id`, `name`, `email`, `password_hash`, `is_active`, `avatar_key`, `biography`, `created_at`, `updated_at`) VALUES
+(1, 'Usuario Demo', 'demo@registro.local', '$2y$10$dV2gAYqWsHaF1uTzXe0NH.RlL7cy9e8l38OyVHLAYqgezpoDgSpNG', 1, NULL, '', '2026-08-09 23:08:22', '2026-08-09 23:08:22');
 
 --
 -- Índices para tablas volcadas

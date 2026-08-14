@@ -2,6 +2,7 @@ import { computed, ref } from 'vue'
 import { personalJournalReadApi } from '../infrastructure/personalJournalReadApi'
 import { insightsApi } from '../infrastructure/insightsApi'
 import { journalApi } from '../../personal-journal/infrastructure/journalApi'
+import { projectCurrentStreak, projectWeeklyProgress } from './wellbeingProjection'
 
 export const insightEntries = ref([])
 export const insightEntryTypes = ref([])
@@ -21,6 +22,13 @@ export const loadingComparison = ref(false)
 export const summaryError = ref('')
 export const trendError = ref('')
 export const comparisonError = ref('')
+
+export const wellbeingStreak = ref(projectCurrentStreak([]))
+export const wellbeingProgress = ref(projectWeeklyProgress(null))
+export const loadingWellbeingStreak = ref(false)
+export const loadingWellbeingProgress = ref(false)
+export const wellbeingStreakError = ref('')
+export const wellbeingProgressError = ref('')
 
 export const hasInsightEntries = computed(() => insightEntries.value.length > 0)
 export const hasMoreInsights = computed(() => insightsPage.value < insightsPages.value)
@@ -121,5 +129,30 @@ export async function loadInsightComparison(params = {}) {
     comparisonError.value = error instanceof Error ? error.message : 'No pudimos comparar tus periodos.'
   } finally {
     loadingComparison.value = false
+  }
+}
+
+export async function loadWellbeingStreak() {
+  loadingWellbeingStreak.value = true
+  wellbeingStreakError.value = ''
+  try {
+    const { items } = await insightsApi.trend({ days: 365 })
+    wellbeingStreak.value = projectCurrentStreak(items)
+  } catch (error) {
+    wellbeingStreakError.value = error instanceof Error ? error.message : 'No pudimos calcular tu racha.'
+  } finally {
+    loadingWellbeingStreak.value = false
+  }
+}
+
+export async function loadWellbeingProgress() {
+  loadingWellbeingProgress.value = true
+  wellbeingProgressError.value = ''
+  try {
+    wellbeingProgress.value = projectWeeklyProgress(await insightsApi.comparison({ period: 'week' }))
+  } catch (error) {
+    wellbeingProgressError.value = error instanceof Error ? error.message : 'No pudimos calcular tu progreso.'
+  } finally {
+    loadingWellbeingProgress.value = false
   }
 }

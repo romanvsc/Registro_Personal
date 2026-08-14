@@ -141,3 +141,14 @@ La entrega final debe incluir:
 - Cualquier contrato o trabajo pendiente perteneciente a otro context.
 
 No se considera terminado un cambio que mezcle responsabilidades entre contexts, introduzca dependencias hacia afuera o eluda un caso de uso desde un controlador.
+
+## 9. Versionado de lanzamientos
+
+El proyecto utiliza obligatoriamente versiones con el formato `MAYOR.MEDIANA.MENOR` (`x.x.x`):
+
+- `MAYOR` se incrementa para cambios mayores. Al hacerlo, `MEDIANA` y `MENOR` se reinician a `0`.
+- `MEDIANA` se incrementa para cambios medianos. Al hacerlo, `MENOR` se reinicia a `0`.
+- `MENOR` se incrementa para cambios menores.
+- La versión inicial de lanzamiento es `1.0.0`.
+
+Todo commit y todo lanzamiento deben indicar explícitamente la versión de lanzamiento a la que pertenecen. La versión visible en la aplicación debe coincidir con esa versión de lanzamiento.

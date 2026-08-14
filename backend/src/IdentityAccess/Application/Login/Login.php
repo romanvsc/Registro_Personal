@@ -5,6 +5,7 @@ namespace App\IdentityAccess\Application\Login;
 
 use App\IdentityAccess\Application\Port\PasswordVerifier;
 use App\IdentityAccess\Application\Port\SessionStore;
+use App\IdentityAccess\Application\UserView;
 use App\IdentityAccess\Domain\User\Repository\UserRepository;
 use App\IdentityAccess\Domain\User\ValueObject\Email;
 use DomainException;
@@ -17,7 +18,7 @@ final readonly class Login
         private SessionStore $sessions,
     ) {}
 
-    /** @return array{id:int,name:string,email:string} */
+    /** @return array{id:int,name:string,email:string,avatarKey:?string,biography:string} */
     public function execute(string $email, string $password): array
     {
         $user = $this->users->findByEmail(new Email($email));
@@ -26,6 +27,6 @@ final readonly class Login
         }
         $user->ensureCanAuthenticate();
         $this->sessions->authenticate($user->id);
-        return ['id' => $user->id, 'name' => $user->name, 'email' => $user->email->value];
+        return UserView::from($user);
     }
 }

@@ -7,6 +7,9 @@ use App\IdentityAccess\Domain\User\Entity\User;
 use App\IdentityAccess\Domain\User\Exception\EmailAlreadyExists;
 use App\IdentityAccess\Domain\User\Repository\UserRepository;
 use App\IdentityAccess\Domain\User\ValueObject\Email;
+use App\IdentityAccess\Domain\User\ValueObject\AvatarKey;
+use App\IdentityAccess\Domain\User\ValueObject\Biography;
+use App\IdentityAccess\Domain\User\ValueObject\UserName;
 use PDO;
 use PDOException;
 
@@ -15,24 +18,26 @@ final readonly class PdoUserRepository implements UserRepository
     public function __construct(private PDO $pdo) {}
     public function findByEmail(Email $email): ?User
     {
-        $stmt = $this->pdo->prepare('SELECT id, name, email, password_hash, is_active FROM users WHERE email = :email LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT id, name, email, password_hash, is_active, avatar_key, biography FROM users WHERE email = :email LIMIT 1');
         $stmt->execute(['email' => $email->value]);
         return $this->hydrate($stmt->fetch() ?: null);
     }
     public function findById(int $id): ?User
     {
-        $stmt = $this->pdo->prepare('SELECT id, name, email, password_hash, is_active FROM users WHERE id = :id LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT id, name, email, password_hash, is_active, avatar_key, biography FROM users WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $id]);
         return $this->hydrate($stmt->fetch() ?: null);
     }
     public function add(User $user): User
     {
         try {
-            $stmt = $this->pdo->prepare('INSERT INTO users (name, email, password_hash, is_active) VALUES (:name, :email, :password_hash, 1)');
+            $stmt = $this->pdo->prepare('INSERT INTO users (name, email, password_hash, is_active, avatar_key, biography) VALUES (:name, :email, :password_hash, 1, :avatar_key, :biography)');
             $stmt->execute([
-                'name' => $user->name,
+                'name' => $user->name->value,
                 'email' => $user->email->value,
                 'password_hash' => $user->passwordHash,
+                'avatar_key' => $user->avatarKey?->value,
+                'biography' => $user->biography->value,
             ]);
         } catch (PDOException $error) {
             $driverCode = isset($error->errorInfo[1]) ? (int)$error->errorInfo[1] : null;
@@ -42,7 +47,21 @@ final readonly class PdoUserRepository implements UserRepository
             throw $error;
         }
 
-        return new User((int)$this->pdo->lastInsertId(), $user->name, $user->email, $user->passwordHash, true);
+        return new User((int)$this->pdo->lastInsertId(), $user->name, $user->email, $user->passwordHash, true, $user->avatarKey, $user->biography);
+    }
+    public function save(User $user): User
+    {
+        if ($user->id === null) throw new \InvalidArgumentException('No se puede actualizar un usuario sin id.');
+        $stmt = $this->pdo->prepare('UPDATE users SET name = :name, avatar_key = :avatar_key, biography = :biography, password_hash = :password_hash WHERE id = :id');
+        $stmt->execute([
+            'name' => $user->name->value,
+            'avatar_key' => $user->avatarKey?->value,
+            'biography' => $user->biography->value,
+            'password_hash' => $user->passwordHash,
+            'id' => $user->id,
+        ]);
+        if ($stmt->rowCount() > 1) throw new \RuntimeException('No se pudo actualizar el perfil.');
+        return $this->findById($user->id) ?? throw new \RuntimeException('No se pudo recuperar el perfil actualizado.');
     }
     public function updatePasswordHash(int $userId, string $passwordHash): void
     {
@@ -52,6 +71,14 @@ final readonly class PdoUserRepository implements UserRepository
     }
     private function hydrate(?array $row): ?User
     {
-        return $row === null ? null : new User((int)$row['id'], $row['name'], new Email($row['email']), $row['password_hash'], (bool)$row['is_active']);
+        return $row === null ? null : new User(
+            (int)$row['id'],
+            new UserName($row['name']),
+            new Email($row['email']),
+            $row['password_hash'],
+            (bool)$row['is_active'],
+            AvatarKey::nullable($row['avatar_key']),
+            new Biography($row['biography']),
+        );
     }
 }

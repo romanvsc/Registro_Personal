@@ -2,9 +2,11 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import { faArrowRightFromBracket, faBars, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { faBars, faXmark } from '@fortawesome/free-solid-svg-icons'
 import AppIcon from './shared/components/AppIcon.vue'
 import ToastHost from './shared/components/ToastHost.vue'
+import AppVersion from './shared/components/AppVersion.vue'
+import AccountMenu from './contexts/identity-access/components/AccountMenu.vue'
 import { sessionStore } from './contexts/identity-access/application/sessionStore'
 import JournalNavigation from './contexts/personal-journal/components/JournalNavigation.vue'
 
@@ -39,6 +41,7 @@ function closeMenu({ restoreFocus = false } = {}) {
 
 function trapSidebarFocus(event) {
   if (event.key === 'Escape') {
+    if (event.target.closest('.account-menu__popover')) return
     event.preventDefault()
     closeMenu({ restoreFocus: true })
     return
@@ -71,9 +74,19 @@ watch(menuOpen, async (open) => {
 
 watch(() => route.fullPath, () => closeMenu())
 onBeforeUnmount(() => document.body.classList.remove('menu-open'))
+
+async function editProfile() {
+  closeMenu()
+  await router.push('/perfil')
+}
+
 async function signOut() {
-  await sessionStore.logout()
-  await router.push('/login')
+  closeMenu()
+  try {
+    await sessionStore.logout()
+  } finally {
+    await router.push('/login')
+  }
 }
 </script>
 
@@ -121,11 +134,7 @@ async function signOut() {
         <p>¿Cómo estuvo tu día?</p>
         <RouterLink to="/registrar/animo">Cuentaselo a Felicia</RouterLink>
       </div>
-      <button class="profile" type="button" :aria-label="`Cerrar sesión de ${user?.name || 'mi cuenta'}`" @click="signOut">
-        <span>{{ user?.name?.slice(0, 2).toUpperCase() || 'MI' }}</span>
-        <span><strong>{{ user?.name || 'Mi cuenta' }}</strong><small>Cerrar sesión</small></span>
-        <b aria-hidden="true"><FontAwesomeIcon :icon="faArrowRightFromBracket" /></b>
-      </button>
+      <AccountMenu v-if="user" :user="user" @edit-profile="editProfile" @logout="signOut" />
     </aside>
     <main :class="recordTheme" :style="recordPatternStyle" :inert="menuOpen ? '' : null" :aria-hidden="menuOpen ? 'true' : null">
       <RouterView v-slot="{ Component, route: viewRoute }">
@@ -136,4 +145,5 @@ async function signOut() {
     </main>
     <ToastHost />
   </div>
+  <AppVersion />
 </template>

@@ -35,5 +35,8 @@ export const authApi = {
     method: 'POST', body: JSON.stringify({ token, password, passwordConfirmation }),
   }),
   current: () => request(`${apiBase}/auth/me`),
+  updateProfile: profile => request(`${apiBase}/auth/profile`, {
+    method: 'PATCH', body: JSON.stringify(profile),
+  }),
   logout: () => request(`${apiBase}/auth/logout`, { method: 'POST' }),
 }

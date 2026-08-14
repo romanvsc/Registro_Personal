@@ -4,9 +4,13 @@ declare(strict_types=1);
 require_once __DIR__ . '/../src/IdentityAccess/Application/Port/SessionStore.php';
 require_once __DIR__ . '/../src/IdentityAccess/Application/Port/PasswordVerifier.php';
 require_once __DIR__ . '/../src/IdentityAccess/Domain/User/ValueObject/Email.php';
+require_once __DIR__ . '/../src/IdentityAccess/Domain/User/ValueObject/UserName.php';
+require_once __DIR__ . '/../src/IdentityAccess/Domain/User/ValueObject/AvatarKey.php';
+require_once __DIR__ . '/../src/IdentityAccess/Domain/User/ValueObject/Biography.php';
 require_once __DIR__ . '/../src/IdentityAccess/Domain/User/Entity/User.php';
 require_once __DIR__ . '/../src/IdentityAccess/Domain/User/Repository/UserRepository.php';
 require_once __DIR__ . '/../src/IdentityAccess/Application/CurrentUser/GetCurrentUser.php';
+require_once __DIR__ . '/../src/IdentityAccess/Application/UserView.php';
 require_once __DIR__ . '/../src/IdentityAccess/Application/Login/Login.php';
 
 use App\IdentityAccess\Application\CurrentUser\GetCurrentUser;
@@ -50,6 +54,7 @@ final class InMemoryUserRepository implements UserRepository
     {
         return new User(2, $user->name, $user->email, $user->passwordHash, true);
     }
+    public function save(User $user): User { return $user; }
     public function updatePasswordHash(int $userId, string $passwordHash): void {}
 }
 
@@ -70,7 +75,7 @@ assert($current->execute() === null);
 $session = new InMemorySessionStore();
 $session->authenticate(1);
 $authenticated = new GetCurrentUser($users, $session);
-assert($authenticated->execute() === ['id' => 1, 'name' => 'Demo', 'email' => 'demo@registro.local']);
+assert($authenticated->execute() === ['id' => 1, 'name' => 'Demo', 'email' => 'demo@registro.local', 'avatarKey' => null, 'biography' => '']);
 
 // Sesión con id inexistente
 $ghostSession = new InMemorySessionStore();

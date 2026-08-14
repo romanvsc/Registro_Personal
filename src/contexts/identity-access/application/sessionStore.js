@@ -24,8 +24,14 @@ async function register(registration) {
   return user.value
 }
 
+async function updateProfile(profile) {
+  user.value = (await authApi.updateProfile(profile)).user
+  checked = true
+  return user.value
+}
+
 async function logout() {
   try { await authApi.logout() } finally { user.value = null; checked = true }
 }
 
-export const sessionStore = { user: readonly(user), restore, login, register, logout }
+export const sessionStore = { user: readonly(user), restore, login, register, updateProfile, logout }

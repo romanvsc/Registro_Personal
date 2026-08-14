@@ -43,7 +43,7 @@ final readonly class ForgotPassword
             $this->tokens->create($user->id, hash('sha256', $plainToken), $now->add(new DateInterval('PT60M')));
         });
         $url = rtrim($this->appUrl, '/') . '/restablecer-contrasena?token=' . rawurlencode($plainToken);
-        try { $this->mailer->send($user->email->value, $user->name, $url); }
+        try { $this->mailer->send($user->email->value, $user->name->value, $url); }
         catch (Throwable) { return self::MESSAGE; }
         return self::MESSAGE;
     }

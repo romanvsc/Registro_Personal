@@ -2,6 +2,9 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../src/IdentityAccess/Domain/User/ValueObject/Email.php';
+require_once __DIR__ . '/../src/IdentityAccess/Domain/User/ValueObject/UserName.php';
+require_once __DIR__ . '/../src/IdentityAccess/Domain/User/ValueObject/AvatarKey.php';
+require_once __DIR__ . '/../src/IdentityAccess/Domain/User/ValueObject/Biography.php';
 require_once __DIR__ . '/../src/IdentityAccess/Domain/User/Entity/User.php';
 
 use App\IdentityAccess\Domain\User\Entity\User;

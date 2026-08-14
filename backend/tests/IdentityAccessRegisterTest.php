@@ -46,6 +46,12 @@ final class RegisterUsers implements UserRepository
         $this->users[$persisted->id] = $persisted;
         return $persisted;
     }
+    public function save(User $user): User
+    {
+        if ($user->id === null) throw new RuntimeException('Usuario sin id.');
+        $this->users[$user->id] = $user;
+        return $user;
+    }
     public function updatePasswordHash(int $userId, string $passwordHash): void
     {
         $user = $this->users[$userId] ?? throw new RuntimeException('Usuario inexistente.');
@@ -89,7 +95,7 @@ $session = new RegisterSession();
 $types = new RegisterTypes();
 $register = makeRegister($users, $session, $types);
 $result = $register->execute('  Roman Demo  ', '  ROMAN@EXAMPLE.COM ', 'una passphrase válida', 'una passphrase válida');
-expect($result === ['id' => 1, 'name' => 'Roman Demo', 'email' => 'roman@example.com'], 'El registro válido no normalizó los datos.');
+expect($result === ['id' => 1, 'name' => 'Roman Demo', 'email' => 'roman@example.com', 'avatarKey' => null, 'biography' => ''], 'El registro válido no normalizó los datos.');
 expect($session->userId === 1 && $session->authentications === 1, 'No se creó la sesión después del registro.');
 expect($types->users === [1], 'No se solicitaron los tipos iniciales para el nuevo usuario.');
 $created = $users->findById(1);
@@ -122,7 +128,7 @@ expect($session->authentications === 1, 'Se creó sesión para un registro falli
 // La creación del usuario se revierte si falla la configuración inicial y no se abre sesión.
 $pdo = new PDO('sqlite::memory:');
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-$pdo->exec('CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, is_active INTEGER NOT NULL)');
+$pdo->exec("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, is_active INTEGER NOT NULL, avatar_key TEXT NULL, biography TEXT NOT NULL DEFAULT '')");
 $rollbackSession = new RegisterSession();
 $rollbackRegister = new Register(
     new PdoUserRepository($pdo),

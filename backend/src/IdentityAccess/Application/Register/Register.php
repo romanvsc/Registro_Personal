@@ -7,6 +7,7 @@ use App\IdentityAccess\Application\Port\InitialEntryTypesProvisioner;
 use App\IdentityAccess\Application\Port\PasswordHasher;
 use App\IdentityAccess\Application\Port\SessionStore;
 use App\IdentityAccess\Application\Port\TransactionManager;
+use App\IdentityAccess\Application\UserView;
 use App\IdentityAccess\Domain\User\Entity\User;
 use App\IdentityAccess\Domain\User\Exception\EmailAlreadyExists;
 use App\IdentityAccess\Domain\User\Repository\UserRepository;
@@ -24,7 +25,7 @@ final readonly class Register
         private TransactionManager $transactions,
     ) {}
 
-    /** @return array{id:int,name:string,email:string} */
+    /** @return array{id:int,name:string,email:string,avatarKey:?string,biography:string} */
     public function execute(string $name, string $email, string $password, string $passwordConfirmation): array
     {
         $normalizedName = trim($name);
@@ -50,6 +51,6 @@ final readonly class Register
 
         if ($created->id === null) throw new RuntimeException('No se pudo identificar al usuario creado.');
         $this->sessions->authenticate($created->id);
-        return ['id' => $created->id, 'name' => $created->name, 'email' => $created->email->value];
+        return UserView::from($created);
     }
 }
