@@ -14,8 +14,8 @@ defineEmits(['confirm', 'cancel'])
       <h2>{{ title }}</h2>
       <p v-if="message">{{ message }}</p>
       <div class="confirm-dialog__actions">
-        <button type="button" class="confirm-dialog__cancel" :disabled="busy" @click="$emit('cancel')">Cancelar</button>
-        <button type="button" class="confirm-dialog__confirm primary-button" :disabled="busy" @click="$emit('confirm')">
+        <button type="button" class="secondary-button" :disabled="busy" @click="$emit('cancel')">Cancelar</button>
+        <button type="button" class="danger-button" :disabled="busy" @click="$emit('confirm')">
           {{ busy ? 'Eliminando…' : confirmLabel }}
         </button>
       </div>
@@ -62,19 +62,9 @@ defineEmits(['confirm', 'cancel'])
   gap: 10px;
 }
 
-.confirm-dialog__cancel {
-  padding: 10px 16px;
-  border: 1px solid var(--dorito-200, #e9c9a8);
-  border-radius: 10px;
-  background: transparent;
-  color: var(--cocoa-800);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.confirm-dialog__cancel:disabled,
-.confirm-dialog__confirm:disabled {
+.confirm-dialog__actions :disabled {
   opacity: 0.6;
   cursor: default;
+  transform: none;
 }
 </style>

@@ -35,7 +35,7 @@ final class InsightsInMemoryRepository implements JournalEntryRepository
     public function summaryForUser(int $userId, ?DateTimeImmutable $from = null, ?DateTimeImmutable $to = null): array
     {
         $rows = $this->own($userId, $from, $to);
-        if (!$rows) return ['total' => 0, 'average' => 0.0, 'min' => 0, 'max' => 0];
+        if (!$rows) return ['total' => 0, 'average' => null, 'min' => null, 'max' => null];
         $values = array_map(static fn (JournalEntry $e) => $e->feelingScore->value, $rows);
         return [
             'total' => count($values),
@@ -127,7 +127,7 @@ assert(count($all['byType']) === 2);
 
 $empty = $summary->execute(2, '2026-08-12', '2026-08-12');
 assert($empty['totalEntries'] === 0);
-assert($empty['averageScore'] === 0.0);
+assert($empty['averageScore'] === null);
 
 $range = $summary->execute(1, '2026-08-10', '2026-08-11');
 assert($range['totalEntries'] === 3);

@@ -87,7 +87,7 @@ final class InMemoryJournalRepository implements JournalEntryRepository
     public function summaryForUser(int $userId, ?DateTimeImmutable $from = null, ?DateTimeImmutable $to = null): array
     {
         $rows = $this->entriesOf($userId, $from, $to);
-        if (!$rows) return ['total' => 0, 'average' => 0.0, 'min' => 0, 'max' => 0];
+        if (!$rows) return ['total' => 0, 'average' => null, 'min' => null, 'max' => null];
         $values = array_map(static fn (JournalEntry $e) => $e->feelingScore->value, $rows);
         return [
             'total' => count($values),

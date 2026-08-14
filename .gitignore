@@ -7,5 +7,6 @@ backend/data/
 deploy/
 backend/data/*.sqlite
 backend/data/*.sqlite-*
+backend/var/
 deploy/backend/config.php
 *.local

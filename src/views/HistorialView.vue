@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   deleteInsightEntry,
@@ -8,6 +8,7 @@ import {
   insightEntryTypes,
   insightsError,
   insightsLoading,
+  insightsPage,
   insightsTotal,
   insightsPages,
   loadMoreInsights,
@@ -33,6 +34,7 @@ const form = reactive({
 
 const deleting = ref(null)
 const deletingBusy = ref(false)
+const filtersExpanded = ref(false)
 
 const DELETE_ERROR_FALLBACK = 'Ocurrió un problema. Intentá nuevamente.'
 const INVALID_ERROR_MESSAGES = new Set(['undefined', 'null', '[object object]'])
@@ -41,6 +43,14 @@ const firstEntryType = computed(() => insightEntryTypes.value[0]?.slug || '')
 
 const hasResults = computed(() => insightEntries.value.length > 0)
 const hasActiveFilters = computed(() => form.type !== 'todos' || form.from || form.to || form.minScore !== '' || form.maxScore !== '' || form.search.trim() !== '')
+const activeFilterCount = computed(() => [
+  form.type !== 'todos',
+  form.from,
+  form.to,
+  form.minScore !== '',
+  form.maxScore !== '',
+  form.search.trim(),
+].filter(Boolean).length)
 
 function filtersFromForm() {
   const filters = {}
@@ -77,6 +87,7 @@ async function applyFilters() {
   if (q.page) delete q.page
   await router.push({ path: '/historial', query: q })
   await load(1)
+  filtersExpanded.value = false
 }
 
 async function clearFilters() {
@@ -88,6 +99,7 @@ async function clearFilters() {
   form.search = ''
   await router.push({ path: '/historial', query: {} })
   await load(1)
+  filtersExpanded.value = false
 }
 
 async function confirmDelete() {
@@ -126,13 +138,19 @@ async function loadMore() {
 
 function onPopState() {
   syncFormFromQuery()
+  filtersExpanded.value = hasActiveFilters.value
   load(currentPageFromQuery())
 }
 
 onMounted(async () => {
   syncFormFromQuery()
+  filtersExpanded.value = hasActiveFilters.value
   await load(currentPageFromQuery())
   window.addEventListener('popstate', onPopState)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('popstate', onPopState)
 })
 </script>
 
@@ -140,11 +158,26 @@ onMounted(async () => {
   <div class="page history-page" :aria-busy="insightsLoading">
     <header class="page-header"><div><p class="eyebrow">TU CAMINO</p><h1>Historial</h1><p>Todos tus momentos, sin perder de vista cómo te hicieron sentir.</p></div><RouterLink v-if="firstEntryType" class="primary-button" :to="`/registrar/${firstEntryType}`"><AppIcon name="nuevo-registro" /> Nuevo registro</RouterLink></header>
 
-    <p v-if="insightsLoading && !insightEntries.length" class="soft-label" role="status">Cargando historial…</p>
+    <div v-if="insightsLoading && !insightEntries.length" class="history-skeleton" role="status">
+      <span class="visually-hidden">Cargando historial…</span>
+      <article v-for="item in 4" :key="item" aria-hidden="true">
+        <i class="skeleton skeleton--avatar"></i>
+        <div><i class="skeleton skeleton--meta"></i><i class="skeleton skeleton--title"></i><i class="skeleton skeleton--copy"></i></div>
+        <div class="history-skeleton__actions"><i class="skeleton skeleton--score"></i><i class="skeleton skeleton--action"></i></div>
+      </article>
+    </div>
     <div v-else-if="insightsError && !insightEntries.length" class="entry-list-empty" role="alert"><img :src="base + 'cats/felipa-molesta.png'" alt="" /><div><h3>No pudimos cargar el historial</h3><p>{{ insightsError }}</p><button class="primary-button" type="button" @click="load(currentPageFromQuery())">Reintentar</button></div></div>
 
     <template v-else>
-      <form class="filter-bar" @submit.prevent="applyFilters">
+      <div class="filter-toolbar">
+        <button class="ghost-button filter-toggle" type="button" aria-controls="history-filters" :aria-expanded="filtersExpanded" @click="filtersExpanded = !filtersExpanded">
+          {{ filtersExpanded ? 'Ocultar filtros' : 'Filtrar historial' }}
+          <span v-if="activeFilterCount" class="filter-count" aria-label="Filtros activos">{{ activeFilterCount }}</span>
+        </button>
+        <button v-if="hasActiveFilters" class="mini-link" type="button" @click="clearFilters">Limpiar filtros</button>
+      </div>
+
+      <form id="history-filters" class="filter-bar" :class="{ 'is-open': filtersExpanded }" @submit.prevent="applyFilters">
         <label><span>Tipo</span><select v-model="form.type"><option value="todos">Todos los tipos</option><option v-for="item in insightEntryTypes" :key="item.slug" :value="item.slug">{{ item.name }}</option></select></label>
         <label><span>Desde</span><input v-model="form.from" type="date" /></label>
         <label><span>Hasta</span><input v-model="form.to" type="date" /></label>
@@ -154,9 +187,12 @@ onMounted(async () => {
         <div class="filter-actions"><button class="primary-button" type="submit">Aplicar filtros</button><button class="ghost-button" type="button" @click="clearFilters">Limpiar</button></div>
       </form>
 
-      <p class="soft-label">{{ insightsTotal }} registro{{ insightsTotal === 1 ? '' : 's' }} · página {{ insightsPage }} de {{ insightsPages }}</p>
+      <p class="results-summary" role="status">
+        <strong>{{ insightsTotal }}</strong> registro{{ insightsTotal === 1 ? '' : 's' }}
+        <span v-if="insightsTotal"> · página {{ insightsPage }} de {{ Math.max(insightsPages, 1) }}</span>
+      </p>
 
-      <div v-if="hasResults" class="history-grid">
+      <div v-if="hasResults" class="history-grid" :class="{ 'is-refreshing': insightsLoading }">
         <article v-for="entry in insightEntries" :key="entry.id" class="history-card">
           <CatScore :score="entry.score" size="lg" />
           <div><span>{{ entry.typeName }} · {{ entry.time }}</span><h2>{{ entry.title }}</h2><p>{{ entry.detail || 'Sin notas' }}</p></div>
@@ -176,6 +212,7 @@ onMounted(async () => {
           <h3>{{ hasActiveFilters ? 'No encontramos registros con estos filtros' : 'No tenés registros' }}</h3>
           <p>{{ hasActiveFilters ? 'Probá ajustar o limpiar los filtros para ver más momentos.' : 'Felipa te espera para registrar el primer momento.' }}</p>
           <button v-if="hasActiveFilters" class="primary-button" type="button" @click="clearFilters">Limpiar filtros</button>
+          <RouterLink v-else-if="firstEntryType" class="primary-button" :to="`/registrar/${firstEntryType}`">Crear primer registro</RouterLink>
         </div>
       </div>
 
@@ -196,6 +233,10 @@ onMounted(async () => {
   border: 1px solid var(--dorito-200, #e9c9a8);
   border-radius: 14px;
   background: var(--cream-50, #fffdf7);
+}
+
+.filter-toolbar {
+  display: none;
 }
 
 .filter-bar label {
@@ -228,16 +269,6 @@ onMounted(async () => {
   justify-content: flex-end;
 }
 
-.ghost-button {
-  padding: 10px 16px;
-  border: 1px solid var(--dorito-200, #e9c9a8);
-  border-radius: 10px;
-  background: transparent;
-  color: var(--cocoa-800);
-  font-weight: 600;
-  cursor: pointer;
-}
-
 .history-card {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -257,27 +288,245 @@ onMounted(async () => {
   gap: 10px;
 }
 
-.mini-link {
+.results-summary {
+  margin: 14px 0;
+  color: var(--cocoa-700);
+  font-size: 13.5px;
+}
+
+.results-summary strong {
+  color: var(--cocoa-900);
+}
+
+.history-card > div:nth-child(2) > span,
+.history-card > div:nth-child(2) > p {
+  color: var(--cocoa-700);
+}
+
+.history-card > div:nth-child(2) > span {
+  font-size: 11.5px;
+}
+
+.history-card > div:nth-child(2) > p {
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.entry-list-empty p {
+  color: var(--cocoa-700);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.entry-list-empty .primary-button {
+  margin-top: 12px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
   border: 0;
-  background: transparent;
-  padding: 2px 0;
-  color: var(--dorito-600, #c07a3d);
-  font-size: 13px;
-  font-weight: 700;
-  text-decoration: none;
-  cursor: pointer;
 }
 
-.mini-link--danger {
-  color: var(--rose-600, #b3403a);
+.history-skeleton {
+  display: grid;
+  gap: 12px;
 }
 
-.filter-bar-error {
-  margin-top: 8px;
+.history-skeleton article {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 20px;
+  min-height: 118px;
+  padding: 20px 24px;
+  border: 1px solid var(--sand-200);
+  border-radius: 20px;
+  background: var(--cream-50);
+}
+
+.history-skeleton article > div:nth-child(2) { min-width: 0; }
+
+.skeleton {
+  display: block;
+  border-radius: 999px;
+  background: var(--sand-200);
+  animation: insight-skeleton-pulse 1.35s ease-in-out infinite;
+}
+
+.skeleton--avatar { width: 76px; height: 76px; border-radius: 18px; }
+.skeleton--meta { width: 110px; height: 9px; margin-bottom: 9px; }
+.skeleton--title { width: min(280px, 72%); height: 17px; margin-bottom: 10px; }
+.skeleton--copy { width: min(430px, 92%); height: 11px; }
+.skeleton--score { width: 44px; height: 15px; }
+.skeleton--action { width: 90px; height: 30px; margin-top: 12px; }
+
+.history-grid.is-refreshing {
+  pointer-events: none;
+  opacity: .62;
+  transition: opacity .18s ease;
+}
+
+.history-card {
+  animation: insight-card-in .32s ease-out both;
+}
+
+.history-card:nth-child(2) { animation-delay: 35ms; }
+.history-card:nth-child(3) { animation-delay: 70ms; }
+.history-card:nth-child(4) { animation-delay: 105ms; }
+.history-card:nth-child(n + 5) { animation-delay: 140ms; }
+
+@keyframes insight-skeleton-pulse {
+  0%, 100% { opacity: .5; }
+  50% { opacity: .92; }
+}
+
+@keyframes insight-card-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @media (max-width: 720px) {
-  .filter-bar { grid-template-columns: repeat(2, 1fr); }
+  .filter-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .filter-toggle {
+    flex: 1;
+    justify-content: space-between;
+  }
+
+  .filter-toolbar > .mini-link {
+    min-height: 44px;
+    padding-inline: 4px;
+  }
+
+  .filter-count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 7px;
+    border-radius: 999px;
+    color: white;
+    background: var(--dorito-500);
+    font-size: 12px;
+  }
+
+  .filter-bar {
+    display: none;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 14px;
+  }
+
+  .filter-bar.is-open {
+    display: grid;
+  }
+
   .filter-search { grid-column: 1 / -1; }
+
+  .filter-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .history-card {
+    grid-template-columns: 58px minmax(0, 1fr);
+    gap: 12px;
+    padding: 15px;
+  }
+
+  .history-card .cat-score.lg {
+    width: 58px;
+    height: 58px;
+  }
+
+  .history-card h2 {
+    font-size: 17px;
+    line-height: 1.25;
+  }
+
+  .history-card__meta {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 10px;
+    border-top: 1px solid var(--sand-100);
+  }
+
+  .history-card__meta > b {
+    color: var(--dorito-600);
+    font-size: 14px;
+  }
+
+  .history-card__actions {
+    gap: 6px;
+  }
+
+  .history-card__actions .mini-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--sand-200);
+    border-radius: 9px;
+    background: var(--cream-50);
+  }
+
+  .history-card__actions .mini-link--danger {
+    border-color: var(--danger-500);
+  }
+
+  .history-skeleton article {
+    grid-template-columns: 58px minmax(0, 1fr);
+    gap: 12px;
+    min-height: 126px;
+    padding: 15px;
+  }
+
+  .history-skeleton__actions {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 10px;
+    border-top: 1px solid var(--sand-100);
+  }
+
+  .history-skeleton__actions .skeleton--action { margin-top: 0; }
+  .history-skeleton .skeleton--avatar { width: 58px; height: 58px; border-radius: 16px; }
+}
+
+@media (max-width: 420px) {
+  .filter-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-search,
+  .filter-actions {
+    grid-column: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .history-card,
+  .skeleton {
+    animation: none;
+  }
+
+  .history-grid.is-refreshing {
+    transition: none;
+  }
 }
 </style>

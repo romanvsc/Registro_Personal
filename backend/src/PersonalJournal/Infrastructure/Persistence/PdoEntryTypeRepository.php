@@ -43,14 +43,21 @@ final readonly class PdoEntryTypeRepository implements EntryTypeRepository
 
     public function save(EntryType $type): EntryType
     {
-        $this->pdo->beginTransaction();
+        $ownsTransaction = !$this->pdo->inTransaction();
+        if ($ownsTransaction) {
+            $this->pdo->beginTransaction();
+        }
 
         try {
             $typeId = $this->upsertType($type);
             $this->rewriteFields($typeId, $type->fields);
-            $this->pdo->commit();
+            if ($ownsTransaction) {
+                $this->pdo->commit();
+            }
         } catch (\Throwable $error) {
-            $this->pdo->rollBack();
+            if ($ownsTransaction && $this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
             throw $error;
         }
 

@@ -45,6 +45,12 @@ final class InMemoryUserRepository implements UserRepository
         }
         return null;
     }
+
+    public function add(User $user): User
+    {
+        return new User(2, $user->name, $user->email, $user->passwordHash, true);
+    }
+    public function updatePasswordHash(int $userId, string $passwordHash): void {}
 }
 
 final class AlwaysTruePasswordVerifier implements PasswordVerifier

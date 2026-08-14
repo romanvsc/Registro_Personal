@@ -27,6 +27,10 @@ DB_USER
 DB_PASSWORD
 APP_BASE_PATH   (default: /registro_gatos)
 CORS_ORIGIN     (vacío = sin cabeceras CORS; se usa el proxy de Vite en desarrollo)
+APP_ENV         (production, local, development o test)
+APP_URL         (URL pública base usada para construir enlaces de recuperación)
+MAIL_FROM       (obligatoria para recuperación en producción)
+MAIL_FROM_NAME  (default: Mi registro)
 ```
 
 Ver `.env.example` como plantilla.
@@ -37,6 +41,8 @@ Importar en phpMyAdmin, en este orden:
 
 1. `backend/src/IdentityAccess/Infrastructure/Persistence/Migrations/20260809_create_users_and_demo.sql`
 2. `backend/src/PersonalJournal/Infrastructure/Persistence/Migrations/20260809_create_parameterized_journal.sql`
+3. `backend/src/PersonalJournal/Infrastructure/Persistence/Migrations/20260813_scope_entry_types_by_user.sql`
+4. `backend/src/IdentityAccess/Infrastructure/Persistence/Migrations/20260814_create_password_reset_tokens.sql`
 
 Los `CREATE TABLE IF NOT EXISTS` y los `ON DUPLICATE KEY UPDATE` hacen que las migraciones sean idempotentes.
 
@@ -50,10 +56,15 @@ php -S 127.0.0.1:8000 -t backend/public backend/router.php
 
 El proxy de Vite reenvía `/registro_gatos/api/*` a `http://127.0.0.1:8000`, por lo que no se necesitan cabeceras CORS en desarrollo.
 
+Para probar recuperación sin correo real, usar `APP_ENV=local` y configurar `APP_URL`. El adaptador local escribe los enlaces en `backend/var/password-reset-links.log`, directorio ignorado por Git. En producción no se registran tokens y se utiliza `mail()` con `MAIL_FROM`/`MAIL_FROM_NAME`; no se incluyen credenciales SMTP en el repositorio.
+
 ## API
 
 - `GET /api/health`
 - `POST /api/auth/login`
+- `POST /api/auth/register`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
 - `GET /api/auth/me`
 - `POST /api/auth/logout`
 - `GET /api/entry-types`

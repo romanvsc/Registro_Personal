@@ -86,20 +86,23 @@ final readonly class PdoJournalEntryRepository implements JournalEntryRepository
     public function summaryForUser(int $userId, ?DateTimeImmutable $from = null, ?DateTimeImmutable $to = null): array
     {
         [$where, $params] = $this->userRangeWhere($userId, $from, $to);
-        $stmt = $this->pdo->prepare("SELECT COUNT(*) AS total, AVG(feeling_score) AS average, COALESCE(MIN(feeling_score), 0) AS min, COALESCE(MAX(feeling_score), 0) AS max FROM journal_entries {$where}");
+        $stmt = $this->pdo->prepare("SELECT COUNT(*) AS total, AVG(feeling_score) AS average, MIN(feeling_score) AS min, MAX(feeling_score) AS max FROM journal_entries {$where}");
         $stmt->execute($params);
         $row = $stmt->fetch();
+        $total = (int) $row['total'];
         return [
-            'total' => (int) $row['total'],
-            'average' => round((float) $row['average'], 1),
-            'min' => (int) $row['min'],
-            'max' => (int) $row['max'],
+            'total' => $total,
+            'average' => $total > 0 ? round((float) $row['average'], 1) : null,
+            'min' => $total > 0 ? (int) $row['min'] : null,
+            'max' => $total > 0 ? (int) $row['max'] : null,
         ];
     }
 
     public function breakdownByType(int $userId, ?DateTimeImmutable $from = null, ?DateTimeImmutable $to = null): array
     {
-        [$where, $params] = $this->userRangeWhere($userId, $from, $to);
+        [$where, $params] = $this->userRangeWhere($userId, $from, $to, 'je');
+        $where .= ' AND et.user_id = ?';
+        $params[] = $userId;
         $stmt = $this->pdo->prepare(
             "SELECT et.slug, et.name, COUNT(je.id) AS total, AVG(je.feeling_score) AS average
              FROM journal_entries je
@@ -150,17 +153,20 @@ final readonly class PdoJournalEntryRepository implements JournalEntryRepository
         ];
     }
 
-    /** @return array{0: string, 1: array<int, string>} */
-    private function userRangeWhere(int $userId, ?DateTimeImmutable $from, ?DateTimeImmutable $to): array
+    /**
+     * @return array{0: string, 1: array<int, mixed>}
+     */
+    private function userRangeWhere(int $userId, ?DateTimeImmutable $from, ?DateTimeImmutable $to, string $table = ''): array
     {
-        $where = 'WHERE user_id = ?';
+        $prefix = $table === '' ? '' : $table . '.';
+        $where = "WHERE {$prefix}user_id = ?";
         $params = [$userId];
         if ($from !== null) {
-            $where .= ' AND occurred_at >= ?';
+            $where .= " AND {$prefix}occurred_at >= ?";
             $params[] = $from->format('Y-m-d 00:00:00');
         }
         if ($to !== null) {
-            $where .= ' AND occurred_at <= ?';
+            $where .= " AND {$prefix}occurred_at <= ?";
             $params[] = $to->format('Y-m-d 23:59:59');
         }
         return [$where, $params];

@@ -20,11 +20,28 @@ use App\PersonalJournal\Application\UpdateEntry\UpdateEntry;
 use App\PersonalJournal\Infrastructure\Persistence\PdoEntryTypeRepository;
 use App\PersonalJournal\Infrastructure\Persistence\PdoJournalEntryRepository;
 use App\IdentityAccess\Application\CurrentUser\GetCurrentUser;
+use App\IdentityAccess\Application\ForgotPassword\ForgotPassword;
+use App\IdentityAccess\Application\ForgotPassword\RateLimitExceeded;
 use App\IdentityAccess\Application\Login\Login;
 use App\IdentityAccess\Application\Logout\Logout;
+use App\IdentityAccess\Application\Register\Register;
+use App\IdentityAccess\Application\Register\RegistrationValidationException;
+use App\IdentityAccess\Application\ResetPassword\InvalidResetToken;
+use App\IdentityAccess\Application\ResetPassword\ResetPassword;
+use App\IdentityAccess\Domain\User\Exception\EmailAlreadyExists;
+use App\IdentityAccess\Infrastructure\Integration\PersonalJournalInitialEntryTypesProvisioner;
 use App\IdentityAccess\Infrastructure\Persistence\PdoUserRepository;
+use App\IdentityAccess\Infrastructure\Persistence\PdoTransactionManager;
+use App\IdentityAccess\Infrastructure\Persistence\PdoPasswordResetTokenRepository;
+use App\IdentityAccess\Infrastructure\Mail\LocalPasswordResetMailer;
+use App\IdentityAccess\Infrastructure\Mail\NativePasswordResetMailer;
+use App\IdentityAccess\Infrastructure\RateLimit\FilePasswordResetRateLimiter;
+use App\IdentityAccess\Infrastructure\Security\CryptographicTokenGenerator;
+use App\IdentityAccess\Infrastructure\Security\NativePasswordHasher;
 use App\IdentityAccess\Infrastructure\Security\NativePasswordVerifier;
 use App\IdentityAccess\Infrastructure\Session\NativePhpSessionStore;
+use App\IdentityAccess\Infrastructure\Time\SystemClock;
+use App\PersonalJournal\Application\ProvisionInitialEntryTypes\ProvisionInitialEntryTypes;
 
 spl_autoload_register(static function (string $class): void {
     $prefix = 'App\\';
@@ -63,6 +80,7 @@ try {
     $types = new PdoEntryTypeRepository($pdo);
     $entries = new PdoJournalEntryRepository($pdo);
     $users = new PdoUserRepository($pdo);
+    $resetTokens = new PdoPasswordResetTokenRepository($pdo);
     $sessions = new NativePhpSessionStore();
     $currentUser = new GetCurrentUser($users, $sessions);
     $basePath = getenv('APP_BASE_PATH') ?: '/registro_gatos';
@@ -72,12 +90,57 @@ try {
     }
     $path = $requestPath === null || $requestPath === '' ? '/' : $requestPath;
     $method = $_SERVER['REQUEST_METHOD'];
+    $appEnvironment = strtolower(getenv('APP_ENV') ?: ($fileConfig['app_env'] ?? 'production'));
+    $appUrl = getenv('APP_URL') ?: ($fileConfig['app_url'] ?? '');
+    $transactionManager = new PdoTransactionManager($pdo);
+    $clock = new SystemClock();
 
     if ($path === '/api/health') respond(['status' => 'ok', 'database' => 'mysql']);
     if ($path === '/api/auth/login' && $method === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
         $user = (new Login($users, new NativePasswordVerifier(), $sessions))->execute((string)($input['email'] ?? ''), (string)($input['password'] ?? ''));
         respond(['user' => $user]);
+    }
+    if ($path === '/api/auth/register' && $method === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
+        if (!is_array($input)) throw new RegistrationValidationException('El formulario de registro es inválido.');
+        $initialTypes = new PersonalJournalInitialEntryTypesProvisioner(new ProvisionInitialEntryTypes($types));
+        $registered = (new Register($users, new NativePasswordHasher(), $sessions, $initialTypes, new PdoTransactionManager($pdo)))->execute(
+            (string)($input['name'] ?? ''),
+            (string)($input['email'] ?? ''),
+            (string)($input['password'] ?? ''),
+            (string)($input['passwordConfirmation'] ?? ''),
+        );
+        respond(['user' => $registered], 201);
+    }
+    if ($path === '/api/auth/forgot-password' && $method === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
+        if (!is_array($input)) $input = [];
+        if ($appUrl === '') throw new RuntimeException('APP_URL debe estar configurada.');
+        $mailer = in_array($appEnvironment, ['local', 'development', 'test'], true)
+            ? new LocalPasswordResetMailer(dirname(__DIR__) . '/var/password-reset-links.log')
+            : new NativePasswordResetMailer(getenv('MAIL_FROM') ?: '', getenv('MAIL_FROM_NAME') ?: 'Mi registro');
+        $message = (new ForgotPassword(
+            $users,
+            $resetTokens,
+            new CryptographicTokenGenerator(),
+            $mailer,
+            new FilePasswordResetRateLimiter(dirname(__DIR__) . '/var/rate-limit/password-reset'),
+            $clock,
+            $transactionManager,
+            $appUrl,
+        ))->execute((string)($input['email'] ?? ''), (string)($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+        respond(['message' => $message]);
+    }
+    if ($path === '/api/auth/reset-password' && $method === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
+        if (!is_array($input)) $input = [];
+        (new ResetPassword($users, $resetTokens, new NativePasswordHasher(), $transactionManager, $clock))->execute(
+            (string)($input['token'] ?? ''),
+            (string)($input['password'] ?? ''),
+            (string)($input['passwordConfirmation'] ?? ''),
+        );
+        respond(['message' => 'Contraseña actualizada']);
     }
     if ($path === '/api/auth/me' && $method === 'GET') {
         $user = $currentUser->execute();
@@ -140,6 +203,14 @@ try {
         respond((new GetComparison($entries))->execute($userId, $_GET['from'] ?? null, $_GET['to'] ?? null, $_GET['period'] ?? null));
     }
     respond(['error' => 'Ruta no encontrada'], 404);
+} catch (RateLimitExceeded $error) {
+    respond(['error' => ['code' => 'PASSWORD_RESET_RATE_LIMITED', 'message' => 'Demasiadas solicitudes. Intentá nuevamente más tarde.']], 429);
+} catch (InvalidResetToken $error) {
+    respond(['error' => ['code' => InvalidResetToken::ERROR_CODE, 'message' => $error->getMessage()]], 422);
+} catch (EmailAlreadyExists $error) {
+    respond(['error' => ['code' => EmailAlreadyExists::ERROR_CODE, 'message' => $error->getMessage()]], 409);
+} catch (RegistrationValidationException $error) {
+    respond(['error' => ['code' => RegistrationValidationException::ERROR_CODE, 'message' => $error->getMessage()]], 422);
 } catch (ConflictException $error) {
     respond(['error' => $error->getMessage()], 409);
 } catch (EntryNotFoundException $error) {

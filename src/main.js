@@ -7,6 +7,9 @@ import HistorialView from './views/HistorialView.vue'
 import EntryTypesListView from './contexts/personal-journal/views/EntryTypesListView.vue'
 import EntryTypeFormView from './contexts/personal-journal/views/EntryTypeFormView.vue'
 import LoginView from './contexts/identity-access/views/LoginView.vue'
+import RegisterView from './contexts/identity-access/views/RegisterView.vue'
+import ForgotPasswordView from './contexts/identity-access/views/ForgotPasswordView.vue'
+import ResetPasswordView from './contexts/identity-access/views/ResetPasswordView.vue'
 import { sessionStore } from './contexts/identity-access/application/sessionStore'
 import './styles.css'
 
@@ -14,6 +17,9 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     { path: '/login', component: LoginView, meta: { publicLayout: true } },
+    { path: '/registro', component: RegisterView, meta: { publicLayout: true } },
+    { path: '/recuperar-contrasena', component: ForgotPasswordView, meta: { publicLayout: true } },
+    { path: '/restablecer-contrasena', component: ResetPasswordView, meta: { publicLayout: true } },
     { path: '/', component: DashboardView },
     { path: '/registrar/:type?', component: RegistroView },
     { path: '/editar/:id', component: RegistroView },
@@ -25,7 +31,7 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   const user = await sessionStore.restore()
-  if (to.path === '/login') return user ? '/' : true
+  if (to.meta.publicLayout) return user ? '/' : true
   return user ? true : { path: '/login', query: { redirect: to.fullPath } }
 })
 

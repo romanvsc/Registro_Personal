@@ -5,6 +5,7 @@ export const entries = ref([])
 export const entryTypes = ref([])
 export const journalLoading = ref(false)
 export const journalError = ref('')
+let entryTypesRequest = null
 
 const assetsBase = import.meta.env.BASE_URL
 
@@ -12,6 +13,21 @@ export function catFor(score) {
   if (score <= 3) return { name: 'Felipa', mood: 'malhumorada', image: `${assetsBase}cats/felipa-molesta.png`, color: 'rose' }
   if (score <= 7) return { name: 'Felicia', mood: 'con fiaca', image: `${assetsBase}cats/felicia-cansada.png`, color: 'sage' }
   return { name: 'Dorito', mood: 'feliz', image: `${assetsBase}cats/dorito-feliz.png`, color: 'orange' }
+}
+
+export async function loadEntryTypes() {
+  if (entryTypes.value.length) return entryTypes.value
+  if (!entryTypesRequest) {
+    entryTypesRequest = journalApi.listTypes()
+      .then((types) => {
+        entryTypes.value = types
+        return types
+      })
+      .finally(() => {
+        entryTypesRequest = null
+      })
+  }
+  return entryTypesRequest
 }
 
 export async function loadJournal() {

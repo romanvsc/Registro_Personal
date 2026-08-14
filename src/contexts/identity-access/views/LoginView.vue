@@ -52,7 +52,7 @@ async function submit() {
       <header class="login-brand">
         <span class="login-brand__mark"><FontAwesomeIcon :icon="faPaw" /></span>
         <div>
-          <strong>Miau <em>registro</em></strong>
+          <strong>Mi <em>registro</em></strong>
           <small>Comé bien. Entrená. Sentite mejor.</small>
         </div>
       </header>
@@ -87,12 +87,12 @@ async function submit() {
 
           <div class="password-row">
             <label for="login-password">Contraseña</label>
-            <button type="button" @click="error = 'La recuperación de contraseña estará disponible próximamente.'">¿La olvidaste?</button>
+            <RouterLink to="/recuperar-contrasena">¿Olvidaste tu contraseña?</RouterLink>
           </div>
           <div class="login-input">
             <img class="login-input__cat-icon" :src="base + 'icons/login-password-cat.svg'" alt="" aria-hidden="true" />
             <input id="login-password" v-model="password" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" placeholder="••••••••" />
-            <button class="toggle-password" type="button" :aria-label="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'" @click="showPassword = !showPassword">
+            <button class="toggle-password" type="button" :aria-label="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'" :aria-pressed="showPassword" @click="showPassword = !showPassword">
               <FontAwesomeIcon :icon="showPassword ? faEyeSlash : faEye" />
             </button>
           </div>
@@ -107,9 +107,9 @@ async function submit() {
 
         <div class="login-divider"><span></span><FontAwesomeIcon :icon="faPaw" /><span></span></div>
         <p class="signup-prompt">¿Todavía no tenés cuenta?</p>
-        <button class="signup-button" type="button" @click="error = 'El registro de usuarios estará disponible próximamente.'">
+        <RouterLink class="signup-button" to="/registro">
           <img :src="base + 'icons/nuevo-registro.svg'" alt="" aria-hidden="true" /> Crear cuenta
-        </button>
+        </RouterLink>
 
         </div>
     </section>
@@ -158,19 +158,20 @@ blockquote { position: relative; z-index: 2; margin: -28px 0 0; color: var(--coc
 h1 { margin: 30px 0 10px; color: var(--cocoa-950); font: 800 clamp(34px, 3.5vw, 48px)/1.12 Nunito; letter-spacing: -.03em; }
 .login-subtitle { margin: 0 0 36px; color: var(--cocoa-500); font-size: 18px; }
 form > label, .password-row label { display: block; color: var(--cocoa-900); font-weight: 700; }
-.login-input { display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 12px; min-height: 62px; margin-top: 11px; padding: 0 18px; border: 1px solid var(--sand-300, #D2C1B2); border-radius: 12px; color: var(--cocoa-400, #AF9E94); background: rgba(255,255,255,.66); transition: border-color .2s, box-shadow .2s; }
+.login-input { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 62px; margin-top: 11px; padding: 0 14px; border: 1px solid var(--sand-400, #B7A08D); border-radius: 12px; color: var(--cocoa-600, #756357); background: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,.9); transition: border-color .2s, box-shadow .2s, background-color .2s; }
 .login-input:focus-within { border-color: var(--dorito-400); box-shadow: 0 0 0 4px rgba(217,120,34,.1); }
 .login-input input { width: 100%; min-width: 0; border: 0; outline: 0; color: var(--cocoa-900); background: transparent; font-size: 17px; }
-.login-input input::placeholder { color: var(--cocoa-400, #AF9E94); }
+.login-input input::placeholder { color: var(--cocoa-500, #928075); opacity: 1; }
 .login-input__cat-icon { width: 30px; height: 30px; margin-left: -4px; object-fit: contain; }
-.password-row { display: flex; align-items: center; justify-content: space-between; margin-top: 28px; }
-.password-row button, .toggle-password { border: 0; color: var(--dorito-600); background: transparent; cursor: pointer; }.password-row button { font-weight: 600; }.toggle-password { padding: 8px; color: var(--cocoa-400, #AF9E94); }
+.password-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; margin-top: 28px; }
+.password-row a, .toggle-password { border: 0; color: var(--dorito-600); background: transparent; cursor: pointer; }.password-row a { font-weight: 700; line-height: 1.45; text-decoration: none; }.toggle-password { display: inline-grid; place-items: center; min-width: 44px; min-height: 44px; margin-right: -10px; padding: 8px; color: var(--cocoa-600, #756357); border-radius: 10px; }
+.password-row a:focus-visible, .toggle-password:focus-visible, .login-submit:focus-visible, .signup-button:focus-visible { outline: 3px solid var(--dorito-300); outline-offset: 3px; }
 .login-error { margin: 12px 0 0; color: #A85041; font-size: 13px; }
 .login-submit, .signup-button { width: 100%; min-height: 64px; border-radius: 12px; font-weight: 800; cursor: pointer; }
 .login-submit { position: relative; display: grid; grid-template-columns: 30px 1fr 30px; align-items: center; margin-top: 34px; padding: 0 20px; border: 0; color: white; background: linear-gradient(90deg, var(--dorito-400), var(--dorito-600)); box-shadow: 0 10px 24px rgba(185,93,23,.18); font-size: 18px; }.login-submit:disabled { opacity: .7; cursor: wait; }.login-submit span { grid-column: 2; }.login-submit svg { grid-column: 1; }
 .login-divider { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 18px; margin: 42px 0 18px; color: var(--cream-400, #D5C3AC); }.login-divider span { height: 1px; background: var(--cream-300, #E8DCCB); }
 .signup-prompt { margin: 0 0 18px; color: var(--cocoa-500); text-align: center; }
-.signup-button { display: flex; align-items: center; justify-content: center; gap: 12px; border: 1px solid var(--dorito-400); color: var(--dorito-600); background: transparent; font-size: 17px; }
+.signup-button { display: flex; align-items: center; justify-content: center; gap: 12px; border: 1px solid var(--dorito-400); color: var(--dorito-600); background: transparent; font-size: 17px; text-decoration: none; }
 .signup-button img { width: 34px; height: 34px; object-fit: contain; }
 
 @media (max-width: 1050px) {
@@ -178,6 +179,14 @@ form > label, .password-row label { display: block; color: var(--cocoa-900); fon
 }
 @media (max-width: 760px) {
   .login-page { display: block; background: var(--cream-100); }.login-story { min-height: auto; padding: 30px 24px 95px; border: 0; }.login-brand { justify-content: center; }.login-brand__mark { width: 50px; height: 50px; border-radius: 14px; font-size: 24px; }.login-brand strong { font-size: 30px; }.login-brand small { margin-top: 5px; font-size: 12px; }.cats-portrait { width: min(450px, 100%); margin-top: 26px; }.cat-intros, blockquote, .story-heart, .decorative-paw { display: none; }
-  .login-access { min-height: auto; margin-top: -68px; padding: 0 16px 22px; background: transparent; }.login-card { min-height: 0; padding: 34px 24px 28px; border-radius: 26px; }.welcome-pill { min-height: 38px; padding: 0 14px; font-size: 13px; } h1 { margin-top: 22px; font-size: 31px; }.login-subtitle { margin-bottom: 28px; font-size: 15px; }.login-input { min-height: 56px; }.login-submit, .signup-button { min-height: 58px; }.login-divider { margin-top: 30px; }
+  .login-access { min-height: auto; margin-top: -68px; padding: 0 16px 22px; background: transparent; }.login-card { min-height: 0; padding: 34px 24px 28px; border-radius: 26px; }.welcome-pill { min-height: 38px; padding: 0 14px; font-size: 13px; } h1 { margin-top: 22px; font-size: 31px; }.login-subtitle { margin-bottom: 28px; font-size: 15px; }.login-input { min-height: 58px; }.login-submit, .signup-button { min-height: 58px; }.login-divider { margin-top: 30px; }
+}
+@media (max-width: 420px) {
+  .login-story { padding-inline: 18px; }
+  .login-access { padding-inline: 10px; }
+  .login-card { padding: 30px 18px 24px; }
+  .password-row { align-items: flex-start; }
+  .password-row a { flex-basis: 100%; }
+  .login-input { gap: 8px; padding-inline: 12px; }
 }
 </style>

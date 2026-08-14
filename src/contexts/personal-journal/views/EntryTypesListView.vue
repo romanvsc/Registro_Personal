@@ -148,8 +148,9 @@ onMounted(loadAdminEntryTypes)
 
 .type-admin-card p {
   margin: 0 0 8px;
-  color: var(--cocoa-500);
-  font-size: 12px;
+  color: var(--cocoa-700);
+  font-size: 14px;
+  line-height: 1.45;
 }
 
 .inactive-badge {
@@ -169,11 +170,11 @@ onMounted(loadAdminEntryTypes)
 }
 
 .field-chips em {
-  padding: 3px 9px;
+  padding: 5px 10px;
   border-radius: 999px;
   background: var(--sand-100);
-  color: var(--cocoa-600);
-  font-size: 11px;
+  color: var(--cocoa-700);
+  font-size: 12px;
   font-style: normal;
 }
 
@@ -181,6 +182,50 @@ onMounted(loadAdminEntryTypes)
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 10px;
+  gap: 4px;
+}
+
+.type-admin-card__actions .mini-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 70px;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.type-admin-card__actions .mini-link:hover {
+  background: var(--dorito-50);
+  text-decoration: none;
+}
+
+.type-admin-card__actions .mini-link--danger:hover {
+  background: var(--danger-50);
+}
+
+@media (max-width: 600px) {
+  .type-admin-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .type-admin-card {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 16px;
+  }
+
+  .type-admin-card__actions {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: flex-end;
+    width: 100%;
+    padding-top: 8px;
+    border-top: 1px solid var(--sand-200);
+  }
+
+  .type-admin-card__actions .mini-link {
+    flex: 1;
+  }
 }
 </style>
