@@ -202,14 +202,16 @@ watch(() => route.path, (path) => {
   display: grid;
   gap: 3px;
   max-height: min(42vh, 360px);
+  overflow-x: hidden;
   overflow-y: auto;
   margin-left: 25px;
-  padding: 3px 0 5px 11px;
+  padding: 3px 8px 5px 11px;
   border-left: 1px solid var(--sand-200);
   scrollbar-width: thin;
 }
 
 .journal-navigation__menu a {
+  min-width: 0;
   min-height: 44px;
   padding: 7px 10px;
   border-radius: 10px;

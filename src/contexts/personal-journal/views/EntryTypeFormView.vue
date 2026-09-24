@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import {
   createEntryType,
   getEntryType,
@@ -8,6 +8,8 @@ import {
 } from '../application/entryTypeAdminStore'
 import { pushToast } from '../../../shared/application/toastStore'
 import AppIcon from '../../../shared/components/AppIcon.vue'
+import ConfirmDialog from '../../../shared/components/ConfirmDialog.vue'
+import { cloneDraft, hasDraftChanges } from '../application/journalDraft'
 
 const route = useRoute()
 const router = useRouter()
@@ -21,13 +23,13 @@ const iconCatalog = [
 
 const inputTypes = ['text', 'textarea', 'number', 'date', 'time', 'select', 'checkbox']
 const inputTypeLabels = {
-  text: 'Texto corto',
-  textarea: 'Texto largo',
-  number: 'Número',
-  date: 'Fecha',
-  time: 'Hora',
-  select: 'Lista de opciones',
-  checkbox: 'Casilla',
+  text: 'Escribiendo algo breve',
+  textarea: 'Escribiendo una respuesta larga',
+  number: 'Ingresando un número',
+  date: 'Eligiendo una fecha',
+  time: 'Eligiendo una hora',
+  select: 'Eligiendo entre varias opciones',
+  checkbox: 'Marcando sí o no',
 }
 
 const iconLabels = {
@@ -54,20 +56,73 @@ const editingId = ref(null)
 const loading = ref(false)
 const saving = ref(false)
 const formError = ref('')
+const initialDraft = ref(null)
+const discardDialog = ref(false)
+const pendingNavigationResolve = ref(null)
+const allowNavigation = ref(false)
 
 const form = reactive({
   name: '',
   slug: '',
-  icon: 'hoy',
+  icon: '',
   sortOrder: 0,
   fields: [],
 })
 
 const slugTouched = ref(false)
-const selectedIconLabel = computed(() => iconLabels[form.icon] || form.icon)
+const iconTouched = ref(false)
+const selectedIconLabel = computed(() => iconLabels[form.icon] || 'Ninguno todavía')
+const currentDraft = computed(() => ({
+  name: form.name,
+  slug: form.slug,
+  icon: form.icon,
+  sortOrder: form.sortOrder,
+  fields: form.fields.map(field => ({
+    fieldKey: field.fieldKey,
+    label: field.label,
+    inputType: field.inputType,
+    required: field.required,
+    options: [...(field.options || [])],
+  })),
+}))
+const hasUnsavedChanges = computed(() => initialDraft.value !== null && hasDraftChanges(currentDraft.value, initialDraft.value))
+
+function setInitialDraft() {
+  initialDraft.value = cloneDraft(currentDraft.value)
+}
+
+function requestNavigation(resolve) {
+  if (!hasUnsavedChanges.value || allowNavigation.value) {
+    resolve(true)
+    return
+  }
+  pendingNavigationResolve.value = resolve
+  discardDialog.value = true
+}
+
+function confirmDiscard() {
+  const resolve = pendingNavigationResolve.value
+  pendingNavigationResolve.value = null
+  discardDialog.value = false
+  allowNavigation.value = true
+  resolve?.(true)
+}
+
+function cancelDiscard() {
+  const resolve = pendingNavigationResolve.value
+  pendingNavigationResolve.value = null
+  discardDialog.value = false
+  resolve?.(false)
+}
+
+onBeforeRouteLeave((_to, _from, next) => requestNavigation(next))
+onBeforeRouteUpdate((_to, _from, next) => requestNavigation(next))
 
 function getErrorMessage(error, fallback) {
   const message = error instanceof Error ? error.message.trim() : ''
+  if (/slug/i.test(message) && /existe/i.test(message)) return 'Ya existe un tipo de registro con ese nombre. Probá con otro.'
+  if (/slug/i.test(message)) return 'No pudimos generar el acceso para este tipo. Revisá el nombre e intentá nuevamente.'
+  if (/fieldKey/i.test(message)) return 'Revisá que todas las preguntas tengan un nombre diferente.'
   if (message && !['undefined', 'null', '[object Object]'].includes(message)) return message
   return fallback
 }
@@ -78,8 +133,54 @@ function suggestSlug() {
   form.slug = normalized.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 }
 
+function normalizedWords(value) {
+  return String(value).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
+function suggestIcon() {
+  if (iconTouched.value) return
+  const name = normalizedWords(form.name)
+  const suggestions = [
+    [/comida|aliment|receta/, 'comidas'],
+    [/entren|ejercicio|actividad/, 'entrenamientos'],
+    [/animo|humor|emocion/, 'estado-animo'],
+    [/sueno|dormir|descanso/, 'sueno'],
+    [/agua|hidrat/, 'agua'],
+    [/peso|balanza/, 'peso'],
+    [/objetivo|meta/, 'objetivos'],
+    [/progreso|evolucion/, 'progreso'],
+    [/racha/, 'racha'],
+  ]
+  form.icon = suggestions.find(([pattern]) => pattern.test(name))?.[1] || ''
+}
+
+function handleNameInput() {
+  suggestSlug()
+  suggestIcon()
+}
+
+function suggestFieldType(field) {
+  if (field.inputTypeTouched) return
+  const fieldName = normalizedWords(`${field.fieldKey} ${field.label}`)
+  if (/duracion|minutos|cantidad|peso|calorias|vasos|horas/.test(fieldName)) field.inputType = 'number'
+  else if (/fecha/.test(fieldName)) field.inputType = 'date'
+  else if (/\bhora\b/.test(fieldName)) field.inputType = 'time'
+  else if (/nota|descripcion|detalle|comentario/.test(fieldName)) field.inputType = 'textarea'
+  else field.inputType = ''
+}
+
+function makeFieldKey(label, fallback) {
+  const key = normalizedWords(label).replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+  return key || fallback
+}
+
+function handleFieldLabelInput(field, index) {
+  if (!field.fieldKeyLocked) field.fieldKey = makeFieldKey(field.label, `pregunta_${index + 1}`)
+  suggestFieldType(field)
+}
+
 function addField() {
-  form.fields.push({ fieldKey: '', label: '', inputType: 'text', required: false, options: [] })
+  form.fields.push({ fieldKey: '', fieldKeyLocked: false, label: '', inputType: '', inputTypeTouched: false, required: false, options: [] })
 }
 
 function removeField(index) {
@@ -94,9 +195,16 @@ function removeOption(field, index) {
   field.options.splice(index, 1)
 }
 
-function normalizeField(field, index) {
+function normalizeField(field, index, usedKeys) {
+  const fallback = `pregunta_${index + 1}`
+  const baseKey = makeFieldKey(field.fieldKey || field.label, fallback)
+  let fieldKey = baseKey
+  let suffix = 2
+  while (usedKeys.has(fieldKey)) fieldKey = `${baseKey}_${suffix++}`
+  usedKeys.add(fieldKey)
+
   return {
-    fieldKey: field.fieldKey.trim(),
+    fieldKey,
     label: field.label.trim(),
     inputType: field.inputType,
     required: field.required,
@@ -109,12 +217,13 @@ async function save() {
   saving.value = true
   formError.value = ''
   try {
+    const usedKeys = new Set()
     const payload = {
       name: form.name,
       slug: form.slug,
       icon: form.icon,
       sortOrder: Number(form.sortOrder) || 0,
-      fields: form.fields.map(normalizeField),
+      fields: form.fields.map((field, index) => normalizeField(field, index, usedKeys)),
     }
     if (editingId.value) {
       await updateEntryType(editingId.value, payload)
@@ -126,6 +235,8 @@ async function save() {
       message: editingId.value ? 'Tipo actualizado.' : 'Tipo creado.',
       duration: 3000,
     })
+    initialDraft.value = null
+    allowNavigation.value = true
     router.push('/configuracion/tipos')
   } catch (error) {
     const message = getErrorMessage(error, 'Ocurrió un problema. Intentá nuevamente.')
@@ -144,12 +255,15 @@ function applyType(type) {
   form.sortOrder = type.sortOrder
   form.fields = type.fields.map(field => ({
     fieldKey: field.key,
+    fieldKeyLocked: true,
     label: field.label,
     inputType: field.inputType,
+    inputTypeTouched: true,
     required: field.required,
     options: field.options ? [...field.options] : [],
   }))
   slugTouched.value = true
+  iconTouched.value = true
 }
 
 onMounted(async () => {
@@ -159,6 +273,7 @@ onMounted(async () => {
     if (id && id !== 'nuevo') {
       applyType(await getEntryType(Number(id)))
     }
+    setInitialDraft()
   } catch (error) {
     formError.value = getErrorMessage(error, 'No se pudo cargar el tipo.')
   } finally {
@@ -172,54 +287,52 @@ const isNew = computed(() => editingId.value === null)
 <template>
   <div class="page admin-page">
     <header class="page-header">
-      <div><p class="eyebrow">CONFIGURACIÓN</p><h1>{{ isNew ? 'Nuevo tipo de registro' : 'Editar tipo de registro' }}</h1><p>Definí el nombre, el icono y los campos que va a pedir.</p></div>
+      <div><p class="eyebrow">CONFIGURACIÓN</p><h1>{{ isNew ? 'Nuevo tipo de registro' : 'Editar tipo de registro' }}</h1><p>Elegí un nombre, un icono y las preguntas que querés responder.</p></div>
     </header>
 
     <p v-if="loading" class="soft-label" role="status">Cargando tipo…</p>
     <form v-else class="record-form type-form" @submit.prevent="save">
-      <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
+      <p v-if="formError" id="entry-type-form-error" class="form-error" role="alert">{{ formError }}</p>
 
       <div class="form-grid type-form__basics">
-        <label><span>Nombre</span><input v-model="form.name" required maxlength="120" placeholder="Ej: Comida" @input="suggestSlug" /></label>
-        <label><span>Slug (identificador en la URL)</span><input v-model="form.slug" required maxlength="80" placeholder="Ej: comida" @input="slugTouched = true" /></label>
-        <label><span>Orden</span><input v-model.number="form.sortOrder" type="number" min="0" placeholder="0" /></label>
-        <fieldset class="icon-fieldset" aria-describedby="icon-picker-help icon-picker-selection">
+        <label class="type-name-field"><span>¿Qué querés registrar?</span><input v-model="form.name" required maxlength="120" placeholder="Ej: Sueño, lectura o meditación" :aria-invalid="Boolean(formError)" :aria-describedby="formError ? 'entry-type-form-error' : undefined" @input="handleNameInput" /></label>
+        <fieldset class="icon-fieldset" :aria-invalid="Boolean(formError)" aria-describedby="icon-picker-help icon-picker-selection">
           <legend>Icono</legend>
           <div class="icon-picker">
             <label v-for="name in iconCatalog" :key="name" class="icon-option" :class="{ active: form.icon === name }" :title="iconLabels[name]">
-              <input v-model="form.icon" type="radio" name="entry-type-icon" :value="name" :aria-label="iconLabels[name]" />
+              <input v-model="form.icon" type="radio" name="entry-type-icon" :value="name" :aria-label="iconLabels[name]" required @change="iconTouched = true" />
               <AppIcon :name="name" aria-hidden="true" />
+              <span class="icon-option__name">{{ iconLabels[name] }}</span>
               <span v-if="form.icon === name" class="icon-option__check" aria-hidden="true">✓</span>
             </label>
           </div>
-          <p id="icon-picker-selection" class="icon-selection" aria-live="polite">Seleccionado: <strong>{{ selectedIconLabel }}</strong></p>
-          <p id="icon-picker-help" class="field-help">Este icono identificará el tipo en las tarjetas y accesos rápidos.</p>
+          <p id="icon-picker-selection" class="icon-selection" aria-live="polite">Icono elegido: <strong>{{ selectedIconLabel }}</strong></p>
+          <p id="icon-picker-help" class="field-help">Lo vas a reconocer por este dibujo en el menú y en tus registros.</p>
         </fieldset>
       </div>
 
       <section class="fields-section">
-        <div class="section-heading"><div><p class="eyebrow">CAMPOS DINÁMICOS</p><h2>¿Qué datos querés capturar?</h2></div><button class="ghost-button" type="button" @click="addField">＋ Agregar campo</button></div>
+        <div class="section-heading"><div><p class="eyebrow">PREGUNTAS</p><h2>¿Qué querés recordar cada vez?</h2></div><button class="ghost-button" type="button" @click="addField">＋ Agregar pregunta</button></div>
 
         <div v-if="form.fields.length" class="field-editor-list">
           <article v-for="(field, index) in form.fields" :key="index" class="field-editor">
             <div class="field-editor__grid">
-              <label><span>Identificador (fieldKey)</span><input v-model="field.fieldKey" required placeholder="duracion" /></label>
-              <label><span>Etiqueta</span><input v-model="field.label" required maxlength="120" placeholder="Duración" /></label>
-              <label><span>Tipo</span><select v-model="field.inputType"><option v-for="type in inputTypes" :key="type" :value="type">{{ inputTypeLabels[type] }}</option></select></label>
-              <label class="check-label"><input v-model="field.required" type="checkbox" /> Obligatorio</label>
+              <label class="field-editor__question"><span>Pregunta</span><input v-model="field.label" required maxlength="120" placeholder="Ej: ¿Cuántas horas dormiste?" :aria-invalid="Boolean(formError)" :aria-describedby="formError ? 'entry-type-form-error' : undefined" @input="handleFieldLabelInput(field, index)" /></label>
+              <label><span>¿Cómo querés responder?</span><select v-model="field.inputType" required :aria-invalid="Boolean(formError)" :aria-describedby="formError ? 'entry-type-form-error' : undefined" @change="field.inputTypeTouched = true"><option disabled value="">Elegí una forma</option><option v-for="type in inputTypes" :key="type" :value="type">{{ inputTypeLabels[type] }}</option></select></label>
+              <label class="check-label"><input v-model="field.required" type="checkbox" /> Pedir siempre</label>
             </div>
             <div v-if="field.inputType === 'select'" class="option-editor">
-              <span>Opciones</span>
+              <span>Respuestas disponibles</span>
               <div v-for="(option, optionIndex) in field.options" :key="optionIndex" class="option-row">
-                <input v-model="field.options[optionIndex]" placeholder="Opción" />
+                <input v-model="field.options[optionIndex]" placeholder="Ej: Bien" />
                 <button type="button" aria-label="Quitar opción" @click="removeOption(field, optionIndex)">×</button>
               </div>
-              <button class="ghost-button" type="button" @click="addOption(field)">＋ Agregar opción</button>
+              <button class="ghost-button" type="button" @click="addOption(field)">＋ Agregar respuesta</button>
             </div>
-            <button class="mini-link mini-link--danger field-editor__remove" type="button" @click="removeField(index)">Quitar campo</button>
+            <button class="mini-link mini-link--danger field-editor__remove" type="button" @click="removeField(index)">Quitar pregunta</button>
           </article>
         </div>
-        <p v-else class="soft-label">Todavía no agregaste campos. Podés guardar el tipo y agregarlos luego.</p>
+        <p v-else class="soft-label">Todavía no agregaste preguntas. Podés guardar este tipo así o sumar una cuando quieras.</p>
       </section>
 
       <div class="form-actions">
@@ -227,6 +340,15 @@ const isNew = computed(() => editingId.value === null)
         <button class="primary-button" type="submit" :disabled="saving">{{ saving ? 'Guardando…' : 'Guardar tipo' }}</button>
       </div>
     </form>
+    <ConfirmDialog
+      v-if="discardDialog"
+      title="¿Descartar cambios?"
+      message="Tenés cambios sin guardar en este tipo de registro. Si salís ahora, se perderán."
+      cancel-label="Seguir editando"
+      confirm-label="Descartar cambios"
+      @confirm="confirmDiscard"
+      @cancel="cancelDiscard"
+    />
   </div>
 </template>
 
@@ -238,6 +360,11 @@ const isNew = computed(() => editingId.value === null)
 .type-form__basics {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: start;
+}
+
+.type-name-field {
+  grid-column: 1 / -1;
+  max-width: 620px;
 }
 
 .type-form__basics > label > span,
@@ -263,7 +390,7 @@ const isNew = computed(() => editingId.value === null)
 
 .icon-picker {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   gap: 8px;
 }
 
@@ -272,8 +399,8 @@ const isNew = computed(() => editingId.value === null)
   display: grid;
   place-items: center;
   min-width: 52px;
-  height: 58px;
-  padding: 0;
+  min-height: 82px;
+  padding: 8px 5px 7px;
   border: 1px solid var(--sand-200);
   border-radius: 12px;
   background: var(--cream-50);
@@ -303,6 +430,18 @@ const isNew = computed(() => editingId.value === null)
 .icon-option .app-icon {
   width: 38px;
   height: 38px;
+}
+
+.icon-option__name {
+  overflow: hidden;
+  width: 100%;
+  color: var(--cocoa-700);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .icon-option__check {
@@ -352,7 +491,7 @@ const isNew = computed(() => editingId.value === null)
 
 .field-editor__grid {
   display: grid;
-  grid-template-columns: minmax(150px, 1fr) minmax(170px, 1.15fr) minmax(150px, .8fr) auto;
+  grid-template-columns: minmax(260px, 1.5fr) minmax(230px, 1fr) auto;
   gap: 12px;
   align-items: end;
 }
@@ -374,6 +513,10 @@ const isNew = computed(() => editingId.value === null)
   border: 1px solid var(--sand-200);
   border-radius: 10px;
   background: white;
+}
+
+.field-editor__question {
+  min-width: 0;
 }
 
 .check-label {
@@ -466,7 +609,7 @@ const isNew = computed(() => editingId.value === null)
   }
 
   .icon-picker {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .section-heading {
@@ -507,6 +650,343 @@ const isNew = computed(() => editingId.value === null)
 
   .type-form :is(input, select, textarea, button):focus {
     scroll-margin-bottom: 96px;
+  }
+}
+
+/* PersonalJournal: editor de tipos como módulo editorial neobrutalista. */
+.admin-page .page-header {
+  padding-left: 18px;
+  border-left: 6px solid var(--dorito-500);
+}
+
+.admin-page .page-header h1 {
+  color: var(--cocoa-950);
+  letter-spacing: -0.03em;
+}
+
+.type-form {
+  max-width: 940px;
+  padding: 30px;
+  border: 3px solid var(--cocoa-950);
+  border-radius: 12px;
+  background: var(--cream-50);
+  box-shadow: 6px 6px 0 var(--cocoa-950);
+}
+
+.type-form > .form-error {
+  border: 2px solid var(--danger-700);
+  border-left-width: 7px;
+  border-radius: 8px;
+  box-shadow: 3px 3px 0 var(--danger-700);
+}
+
+.type-form__basics {
+  gap: 18px;
+}
+
+.type-name-field {
+  padding: 16px;
+  border: 2px solid var(--cocoa-950);
+  border-left: 7px solid var(--dorito-500);
+  border-radius: 8px;
+  background: var(--dorito-50);
+  box-shadow: 3px 3px 0 var(--cocoa-950);
+}
+
+.type-form__basics > label > span,
+.icon-fieldset legend {
+  color: var(--cocoa-950);
+  font-weight: 800;
+}
+
+.type-name-field input,
+.field-editor__grid input,
+.field-editor__grid select,
+.option-row input {
+  border: 2px solid var(--cocoa-950);
+  border-radius: 6px;
+  background: var(--cream-50);
+}
+
+.type-form :is(input, select, textarea, button):focus-visible {
+  outline: 3px solid var(--dorito-500);
+  outline-offset: 3px;
+}
+
+.icon-fieldset {
+  padding: 18px;
+  border: 3px solid var(--cocoa-950);
+  border-radius: 10px;
+  background: var(--felicia-50);
+  box-shadow: 4px 4px 0 var(--cocoa-950);
+}
+
+.icon-picker {
+  gap: 10px;
+}
+
+.icon-option {
+  min-height: 86px;
+  padding: 9px 5px 8px;
+  border: 2px solid var(--cocoa-950);
+  border-radius: 7px;
+  background: var(--cream-50);
+  box-shadow: 2px 2px 0 var(--cocoa-950);
+  transition: transform .16s ease, box-shadow .16s ease, background-color .16s ease;
+}
+
+.icon-option:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0 var(--cocoa-950);
+}
+
+.icon-option.active {
+  border-color: var(--cocoa-950);
+  background: var(--dorito-300);
+  box-shadow: 4px 4px 0 var(--cocoa-950);
+}
+
+.icon-option:focus-within {
+  outline: 3px solid var(--dorito-500);
+  outline-offset: 3px;
+}
+
+.icon-option__name {
+  color: var(--cocoa-950);
+  font-weight: 800;
+}
+
+.icon-option__check {
+  right: 4px;
+  bottom: 4px;
+  width: 19px;
+  height: 19px;
+  border: 2px solid var(--cocoa-950);
+  border-radius: 5px;
+  color: var(--cocoa-950);
+  background: var(--cream-50);
+  font-size: 11px;
+}
+
+.icon-selection {
+  color: var(--cocoa-950);
+  font-weight: 700;
+}
+
+.field-help {
+  color: var(--cocoa-700);
+}
+
+.fields-section {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 3px solid var(--cocoa-950);
+}
+
+.section-heading {
+  margin-bottom: 20px;
+}
+
+.section-heading h2 {
+  color: var(--cocoa-950);
+  letter-spacing: -0.02em;
+}
+
+.section-heading .ghost-button,
+.option-editor .ghost-button {
+  border: 2px solid var(--cocoa-950);
+  border-radius: 6px;
+  color: var(--cocoa-950);
+  background: var(--felicia-100);
+  box-shadow: 3px 3px 0 var(--cocoa-950);
+  font-weight: 800;
+}
+
+.section-heading .ghost-button:hover,
+.option-editor .ghost-button:hover {
+  border-color: var(--cocoa-950);
+  color: var(--cocoa-950);
+  background: var(--dorito-100);
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0 var(--cocoa-950);
+}
+
+.field-editor-list {
+  gap: 18px;
+}
+
+.field-editor {
+  padding: 20px;
+  border: 3px solid var(--cocoa-950);
+  border-left: 8px solid var(--felicia-500);
+  border-radius: 9px;
+  background: var(--felicia-50);
+  box-shadow: 4px 4px 0 var(--cocoa-950);
+}
+
+.field-editor:nth-child(3n + 2) {
+  border-left-color: var(--dorito-500);
+  background: var(--dorito-50);
+}
+
+.field-editor:nth-child(3n + 3) {
+  border-left-color: var(--danger-500);
+  background: var(--danger-50);
+}
+
+.field-editor__grid label span,
+.option-editor > span {
+  color: var(--cocoa-950);
+  font-weight: 800;
+}
+
+.check-label {
+  padding: 8px;
+  border: 2px solid var(--cocoa-950);
+  border-radius: 6px;
+  color: var(--cocoa-950);
+  background: var(--cream-50);
+  box-shadow: 2px 2px 0 var(--cocoa-950);
+}
+
+.check-label input {
+  width: 20px;
+  height: 20px;
+}
+
+.option-editor {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 2px dashed var(--cocoa-700);
+}
+
+.option-row button {
+  border: 2px solid var(--danger-700);
+  border-radius: 6px;
+  color: var(--danger-700);
+  background: var(--danger-50);
+  box-shadow: 2px 2px 0 var(--danger-700);
+}
+
+.option-row button:hover {
+  background: var(--danger-100);
+  transform: translate(-1px, -1px);
+}
+
+.field-editor__remove {
+  margin-top: 18px;
+  padding: 0 12px;
+  border: 2px solid var(--danger-700);
+  border-radius: 6px;
+  color: var(--danger-700);
+  background: var(--danger-50);
+  box-shadow: 2px 2px 0 var(--danger-700);
+}
+
+.field-editor__remove:hover {
+  color: var(--danger-700);
+  background: var(--danger-100);
+  text-decoration: none;
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--danger-700);
+}
+
+.form-actions {
+  margin-top: 30px;
+  padding-top: 18px;
+  border-top: 3px solid var(--cocoa-950);
+}
+
+.form-actions > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 2px solid var(--cocoa-950);
+  border-radius: 7px;
+  color: var(--cocoa-950);
+  background: var(--cream-50);
+  box-shadow: 3px 3px 0 var(--cocoa-950);
+  font-weight: 800;
+}
+
+.form-actions > a:hover {
+  color: var(--cocoa-950);
+  text-decoration: none;
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0 var(--cocoa-950);
+}
+
+.form-actions .primary-button {
+  border: 2px solid var(--cocoa-950);
+  border-radius: 7px;
+  color: var(--cocoa-950);
+  background: var(--dorito-300);
+  box-shadow: 4px 4px 0 var(--cocoa-950);
+}
+
+.form-actions .primary-button:hover {
+  color: var(--cocoa-950);
+  background: var(--dorito-400);
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--cocoa-950);
+}
+
+.soft-label {
+  padding: 18px;
+  border: 2px dashed var(--cocoa-950);
+  border-radius: 8px;
+  color: var(--cocoa-950);
+  background: var(--felicia-50);
+}
+
+@media (max-width: 720px) {
+  .type-form {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 520px) {
+  .admin-page .page-header {
+    padding-left: 12px;
+  }
+
+  .type-form {
+    border-width: 2px;
+    box-shadow: 4px 4px 0 var(--cocoa-950);
+  }
+
+  .icon-fieldset,
+  .field-editor {
+    box-shadow: 3px 3px 0 var(--cocoa-950);
+  }
+
+  .form-actions {
+    border-top-width: 2px;
+    background: var(--cream-50);
+    box-shadow: 4px 4px 0 var(--cocoa-950);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-option,
+  .section-heading .ghost-button,
+  .option-editor .ghost-button,
+  .field-editor__remove,
+  .option-row button,
+  .form-actions > a,
+  .form-actions .primary-button {
+    transition: none;
+  }
+
+  .icon-option:hover,
+  .section-heading .ghost-button:hover,
+  .option-editor .ghost-button:hover,
+  .field-editor__remove:hover,
+  .option-row button:hover,
+  .form-actions > a:hover,
+  .form-actions .primary-button:hover {
+    transform: none;
   }
 }
 </style>

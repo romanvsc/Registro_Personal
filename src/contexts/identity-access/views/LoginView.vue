@@ -1,7 +1,8 @@
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { nextTick, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { sessionStore } from '../application/sessionStore'
+import { getSafeRedirect } from '../application/safeRedirect'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import {
   faPaw,
@@ -10,12 +11,21 @@ import {
 } from '@fortawesome/free-solid-svg-icons'
 
 const router = useRouter()
+const route = useRoute()
 const base = import.meta.env.BASE_URL
 const email = ref('')
 const password = ref('')
 const showPassword = ref(false)
 const submitting = ref(false)
 const error = ref('')
+const emailInput = ref(null)
+const passwordInput = ref(null)
+
+async function focusFirstError() {
+  await nextTick()
+  const target = !email.value ? emailInput.value : passwordInput.value
+  target?.focus()
+}
 
 const cats = [
   { name: 'Dorito', message: 'Hoy puede ser un buen día.', image: `${base}cats/dorito-contento.png`, tone: 'dorito' },
@@ -27,15 +37,17 @@ async function submit() {
   error.value = ''
   if (!email.value || !password.value) {
     error.value = 'Completá tu email y contraseña para continuar.'
+    await focusFirstError()
     return
   }
 
   submitting.value = true
   try {
     await sessionStore.login(email.value, password.value)
-    await router.push('/')
+    await router.push(getSafeRedirect(route.query.redirect))
   } catch (requestError) {
     error.value = requestError.message
+    await focusFirstError()
   } finally {
     submitting.value = false
   }
@@ -82,7 +94,7 @@ async function submit() {
           <label for="login-email">Email</label>
           <div class="login-input">
             <img class="login-input__cat-icon" :src="base + 'icons/login-email-cat.svg'" alt="" aria-hidden="true" />
-            <input id="login-email" v-model.trim="email" type="email" autocomplete="email" placeholder="nombre@email.com" />
+            <input id="login-email" ref="emailInput" v-model.trim="email" type="email" autocomplete="email" placeholder="nombre@email.com" :aria-invalid="Boolean(error)" :aria-describedby="error ? 'login-error' : undefined" />
           </div>
 
           <div class="password-row">
@@ -91,13 +103,13 @@ async function submit() {
           </div>
           <div class="login-input">
             <img class="login-input__cat-icon" :src="base + 'icons/login-password-cat.svg'" alt="" aria-hidden="true" />
-            <input id="login-password" v-model="password" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" placeholder="••••••••" />
+            <input id="login-password" ref="passwordInput" v-model="password" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" placeholder="••••••••" :aria-invalid="Boolean(error)" :aria-describedby="error ? 'login-error' : undefined" />
             <button class="toggle-password" type="button" :aria-label="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'" :aria-pressed="showPassword" @click="showPassword = !showPassword">
               <FontAwesomeIcon :icon="showPassword ? faEyeSlash : faEye" />
             </button>
           </div>
 
-          <p v-if="error" class="login-error" role="alert">{{ error }}</p>
+          <p v-if="error" id="login-error" class="login-error" role="alert">{{ error }}</p>
 
           <button class="login-submit" type="submit" :disabled="submitting">
             <FontAwesomeIcon :icon="faPaw" />
@@ -189,4 +201,24 @@ form > label, .password-row label { display: block; color: var(--cocoa-900); fon
   .password-row a { flex-basis: 100%; }
   .login-input { gap: 8px; padding-inline: 12px; }
 }
+
+/* Neo-brutalist identity surface: warm, explicit and easy to scan. */
+.login-page { background: var(--cream-100); }
+.login-story { border-right: 3px solid var(--cocoa-950); background: var(--sand-50); }
+.login-brand__mark { border: 3px solid var(--cocoa-950); border-radius: 14px; background: var(--dorito-500); box-shadow: 4px 4px 0 var(--cocoa-950); }
+.cats-portrait { filter: drop-shadow(6px 8px 0 rgba(48,39,32,.18)); }
+.cat-intros article { border: 2px solid var(--cocoa-800); border-radius: 12px; background: var(--cream-50); box-shadow: 3px 3px 0 var(--cocoa-800); }
+.login-access { background: var(--cream-100); }
+.login-card { border: 3px solid var(--cocoa-950); border-radius: 12px; background: var(--cream-50); box-shadow: 6px 6px 0 var(--cocoa-950); backdrop-filter: none; }
+.welcome-pill { border: 2px solid var(--cocoa-950); border-radius: 9px; color: var(--cocoa-950); background: var(--dorito-100); box-shadow: 3px 3px 0 var(--cocoa-950); }
+.login-input { border: 2px solid var(--cocoa-900); border-radius: 9px; background: var(--cream-50); box-shadow: none; }
+.login-input:focus-within { border-color: var(--dorito-600); outline: 3px solid var(--dorito-300); outline-offset: 2px; box-shadow: none; }
+.login-error { padding: 9px 12px; border: 2px solid var(--danger-600); border-left-width: 6px; color: var(--danger-700, #874033); background: var(--danger-50, #fff0ec); font-weight: 700; }
+.login-submit, .signup-button { border: 2px solid var(--cocoa-950); border-radius: 9px; box-shadow: 4px 4px 0 var(--cocoa-950); transition: transform .16s ease, box-shadow .16s ease, background-color .16s ease; }
+.login-submit { background: var(--dorito-500); }
+.signup-button { background: var(--lavender-100, #ece8ff); color: var(--cocoa-950); }
+.login-submit:hover:not(:disabled), .signup-button:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--cocoa-950); }
+.login-submit:focus-visible, .signup-button:focus-visible, .toggle-password:focus-visible { outline: 3px solid var(--dorito-600); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .login-submit, .signup-button { transition: none; }.login-submit:hover:not(:disabled), .signup-button:hover { transform: none; } }
+@media (max-width: 760px) { .login-story { border-right: 0; border-bottom: 3px solid var(--cocoa-950); } }
 </style>

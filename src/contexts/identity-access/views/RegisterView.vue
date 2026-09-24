@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { nextTick, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { faEye, faEyeSlash, faPaw } from '@fortawesome/free-solid-svg-icons'
@@ -13,6 +13,20 @@ const showPassword = ref(false)
 const showConfirmation = ref(false)
 const submitting = ref(false)
 const error = ref('')
+const nameInput = ref(null)
+const emailInput = ref(null)
+const passwordInput = ref(null)
+const confirmationInput = ref(null)
+
+async function focusFirstError() {
+  await nextTick()
+  const target = !form.name ? nameInput.value
+    : !form.email ? emailInput.value
+      : !form.password ? passwordInput.value
+        : !form.passwordConfirmation ? confirmationInput.value
+          : nameInput.value
+  target?.focus()
+}
 
 async function submit() {
   if (submitting.value) return
@@ -26,6 +40,7 @@ async function submit() {
     error.value = typeof requestError?.message === 'string' && requestError.message.trim()
       ? requestError.message.trim()
       : 'Ocurrió un problema. Intentá nuevamente.'
+    await focusFirstError()
   } finally {
     submitting.value = false
   }
@@ -53,19 +68,19 @@ async function submit() {
           <label for="register-name">Nombre</label>
           <div class="register-input">
             <FontAwesomeIcon :icon="faPaw" aria-hidden="true" />
-            <input id="register-name" v-model="form.name" name="name" type="text" autocomplete="name" maxlength="120" placeholder="¿Cómo te llamás?" required />
+            <input id="register-name" ref="nameInput" v-model="form.name" name="name" type="text" autocomplete="name" maxlength="120" placeholder="¿Cómo te llamás?" required :aria-invalid="Boolean(error)" :aria-describedby="error ? 'register-error' : undefined" />
           </div>
 
           <label for="register-email">Correo electrónico</label>
           <div class="register-input">
             <img :src="base + 'icons/login-email-cat.svg'" alt="" aria-hidden="true" />
-            <input id="register-email" v-model="form.email" name="email" type="email" autocomplete="email" placeholder="nombre@email.com" required />
+            <input id="register-email" ref="emailInput" v-model="form.email" name="email" type="email" autocomplete="email" placeholder="nombre@email.com" required :aria-invalid="Boolean(error)" :aria-describedby="error ? 'register-error' : undefined" />
           </div>
 
           <label for="register-password">Contraseña</label>
           <div class="register-input">
             <img :src="base + 'icons/login-password-cat.svg'" alt="" aria-hidden="true" />
-            <input id="register-password" v-model="form.password" name="password" :type="showPassword ? 'text' : 'password'" autocomplete="new-password" minlength="8" placeholder="Mínimo 8 caracteres" aria-describedby="register-password-help" required />
+            <input id="register-password" ref="passwordInput" v-model="form.password" name="password" :type="showPassword ? 'text' : 'password'" autocomplete="new-password" minlength="8" placeholder="Mínimo 8 caracteres" :aria-invalid="Boolean(error)" :aria-describedby="error ? 'register-error register-password-help' : 'register-password-help'" required />
             <button type="button" :aria-label="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'" :aria-pressed="showPassword" @click="showPassword = !showPassword"><FontAwesomeIcon :icon="showPassword ? faEyeSlash : faEye" /></button>
           </div>
           <p id="register-password-help" class="password-help">Podés usar una frase fácil de recordar. No exigimos símbolos ni mayúsculas.</p>
@@ -73,11 +88,11 @@ async function submit() {
           <label for="register-confirmation">Confirmar contraseña</label>
           <div class="register-input">
             <img :src="base + 'icons/login-password-cat.svg'" alt="" aria-hidden="true" />
-            <input id="register-confirmation" v-model="form.passwordConfirmation" name="passwordConfirmation" :type="showConfirmation ? 'text' : 'password'" autocomplete="new-password" minlength="8" placeholder="Repetí tu contraseña" required />
+            <input id="register-confirmation" ref="confirmationInput" v-model="form.passwordConfirmation" name="passwordConfirmation" :type="showConfirmation ? 'text' : 'password'" autocomplete="new-password" minlength="8" placeholder="Repetí tu contraseña" required :aria-invalid="Boolean(error)" :aria-describedby="error ? 'register-error' : undefined" />
             <button type="button" :aria-label="showConfirmation ? 'Ocultar confirmación' : 'Mostrar confirmación'" :aria-pressed="showConfirmation" @click="showConfirmation = !showConfirmation"><FontAwesomeIcon :icon="showConfirmation ? faEyeSlash : faEye" /></button>
           </div>
 
-          <p v-if="error" class="register-error" role="alert">{{ error }}</p>
+          <p v-if="error" id="register-error" class="register-error" role="alert">{{ error }}</p>
           <button class="register-submit" type="submit" :disabled="submitting">
             <img :src="base + 'icons/nuevo-registro.svg'" alt="" aria-hidden="true" />
             <span>{{ submitting ? 'Creando cuenta…' : 'Crear cuenta' }}</span>
@@ -110,4 +125,23 @@ form > label { display: block; margin-top: 18px; color: var(--cocoa-900); font-w
 .login-prompt { margin: 24px 0 0; color: var(--cocoa-600); text-align: center; }.login-prompt a { color: var(--dorito-600); font-weight: 800; text-decoration: none; }
 @media (max-width: 900px) { .register-page { grid-template-columns: 1fr; }.register-story { min-height: 250px; padding: 26px 24px 60px; border: 0; }.register-cats { width: min(380px, 86%); height: 174px; margin-top: 8px; }.register-story blockquote { display: none; }.register-access { min-height: auto; margin-top: -44px; padding: 0 16px 24px; background: transparent; }.register-card { padding: 30px 24px; border-radius: 26px; }.register-brand { justify-content: center; }.register-brand > span { width: 50px; height: 50px; font-size: 24px; }.register-brand strong { font-size: 30px; }.register-brand small { font-size: 12px; } }
 @media (max-width: 420px) { .register-story { min-height: 218px; padding: 22px 18px 52px; }.register-cats { width: min(320px, 88%); height: 140px; }.register-access { margin-top: -40px; padding-inline: 10px; }.register-card { padding: 26px 18px 24px; border-radius: 24px; }.register-subtitle { margin-bottom: 20px; font-size: 15px; }.welcome-pill { min-height: 38px; padding-inline: 13px; font-size: 13px; }h1 { margin-top: 18px; font-size: 30px; }form > label { margin-top: 15px; }.register-input { gap: 8px; min-height: 56px; padding-inline: 12px; }.password-help { font-size: 14px; line-height: 1.45; }.register-submit { margin-top: 22px; }.login-prompt { margin-top: 20px; } }
+
+/* Neo-brutalist identity surface: warm, explicit and easy to scan. */
+.register-page { background: var(--cream-100); }
+.register-story { border-right: 3px solid var(--cocoa-950); background: var(--sand-50); }
+.register-brand > span { border: 3px solid var(--cocoa-950); border-radius: 14px; background: var(--dorito-500); box-shadow: 4px 4px 0 var(--cocoa-950); }
+.register-cats { filter: drop-shadow(6px 8px 0 rgba(48,39,32,.16)); }
+.register-access { background: var(--cream-100); }
+.register-card { border: 3px solid var(--cocoa-950); border-radius: 12px; background: var(--cream-50); box-shadow: 6px 6px 0 var(--cocoa-950); }
+.welcome-pill { border: 2px solid var(--cocoa-950); border-radius: 9px; color: var(--cocoa-950); background: var(--dorito-100); box-shadow: 3px 3px 0 var(--cocoa-950); }
+.register-input { border: 2px solid var(--cocoa-900); border-radius: 9px; background: var(--cream-50); box-shadow: none; }
+.register-input:focus-within { border-color: var(--dorito-600); outline: 3px solid var(--dorito-300); outline-offset: 2px; box-shadow: none; }
+.register-input button:focus-visible { outline: 3px solid var(--dorito-600); outline-offset: 2px; }
+.register-error { padding: 9px 12px; border: 2px solid var(--danger-600); border-left-width: 6px; color: var(--danger-700, #874033); background: var(--danger-50, #fff0ec); font-weight: 700; }
+.register-submit { border: 2px solid var(--cocoa-950); border-radius: 9px; background: var(--dorito-500); box-shadow: 4px 4px 0 var(--cocoa-950); transition: transform .16s ease, box-shadow .16s ease, background-color .16s ease; }
+.register-submit:hover:not(:disabled) { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--cocoa-950); }
+.login-prompt a { display: inline-block; padding: 2px 6px; border: 2px solid var(--cocoa-950); border-radius: 6px; color: var(--cocoa-950); background: var(--lavender-100, #ece8ff); }
+.register-submit:focus-visible, .login-prompt a:focus-visible { outline: 3px solid var(--dorito-600); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .register-submit { transition: none; }.register-submit:hover:not(:disabled) { transform: none; } }
+@media (max-width: 900px) { .register-story { border-right: 0; border-bottom: 3px solid var(--cocoa-950); } }
 </style>

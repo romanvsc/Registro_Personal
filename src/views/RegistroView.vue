@@ -1,27 +1,139 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import { addEntry, catFor, editEntry, entryTypes, journalError, loadEntry, loadJournal } from '../lib/entries'
 import { pushToast } from '../shared/application/toastStore'
+import ConfirmDialog from '../shared/components/ConfirmDialog.vue'
+import {
+  cloneDraft,
+  hasDiscardableValues,
+  hasDraftChanges,
+  sanitizeValuesForType,
+} from '../contexts/personal-journal/application/journalDraft'
 
 const route = useRoute()
 const router = useRouter()
 const editingId = ref(null)
 const type = ref('')
-const score = ref(7)
+const score = ref(null)
 const title = ref('')
 const notes = ref('')
 const occurredAt = ref('')
 const values = reactive({})
 const saving = ref(false)
 const loading = ref(false)
+const saveAttempted = ref(false)
+const scoreInput = ref(null)
+const initialDraft = ref(null)
+const discardDialog = ref(null)
+const pendingType = ref('')
+const pendingNavigationResolve = ref(null)
+const allowNavigation = ref(false)
+// En un registro nuevo priorizamos la captura rápida. Al editar, los detalles
+// quedan visibles para que ningún dato existente quede oculto.
+const detailsOpen = ref(false)
 const selectedType = computed(() => entryTypes.value.find(item => item.slug === type.value) || entryTypes.value[0])
-const cat = computed(() => catFor(score.value))
+const hasScore = computed(() => Number.isInteger(score.value) && score.value >= 1 && score.value <= 10)
+const cat = computed(() => hasScore.value ? catFor(score.value) : null)
 const scoreDescription = computed(() => {
+  if (!hasScore.value) return 'Elegí una sensación del 1 al 10'
   if (score.value <= 3) return `${score.value} de 10, te acompaña Felipa`
   if (score.value <= 7) return `${score.value} de 10, te acompaña Felicia`
   return `${score.value} de 10, te acompaña Dorito`
 })
+
+const currentDraft = computed(() => ({
+  type: type.value,
+  score: score.value,
+  title: title.value,
+  notes: notes.value,
+  occurredAt: occurredAt.value,
+  values: { ...values },
+}))
+const hasUnsavedChanges = computed(() => initialDraft.value !== null && hasDraftChanges(currentDraft.value, initialDraft.value))
+
+function setInitialDraft() {
+  initialDraft.value = cloneDraft(currentDraft.value)
+  saveAttempted.value = false
+}
+
+function clearDynamicValues(typeDefinition) {
+  const sanitized = sanitizeValuesForType(values, typeDefinition)
+  Object.keys(values).forEach(key => delete values[key])
+  Object.assign(values, sanitized)
+}
+
+function changeType(nextType) {
+  const nextDefinition = entryTypes.value.find(item => item.slug === nextType)
+  if (!nextDefinition || nextType === type.value) return
+  if (hasDiscardableValues(values, nextDefinition)) {
+    pendingType.value = nextType
+    discardDialog.value = 'type'
+    return
+  }
+  type.value = nextType
+  clearDynamicValues(nextDefinition)
+  saveAttempted.value = false
+}
+
+function finishTypeChange() {
+  const nextDefinition = entryTypes.value.find(item => item.slug === pendingType.value)
+  if (!nextDefinition) return
+  type.value = pendingType.value
+  clearDynamicValues(nextDefinition)
+  pendingType.value = ''
+  discardDialog.value = null
+  saveAttempted.value = false
+}
+
+function requestNavigation(resolve, nextRoute = null) {
+  if (!hasUnsavedChanges.value || allowNavigation.value) {
+    resolve(true)
+    return
+  }
+  if (nextRoute?.params?.type && nextRoute.params.type !== route.params.type) {
+    pendingType.value = String(nextRoute.params.type)
+    const nextDefinition = entryTypes.value.find(item => item.slug === nextRoute.params.type)
+    if (nextDefinition && hasDiscardableValues(values, nextDefinition)) {
+      pendingType.value = String(nextRoute.params.type)
+      discardDialog.value = 'route-type'
+      pendingNavigationResolve.value = resolve
+      return
+    }
+  }
+  discardDialog.value = 'leave'
+  pendingNavigationResolve.value = resolve
+}
+
+function confirmDiscard() {
+  const mode = discardDialog.value
+  const resolve = pendingNavigationResolve.value
+  pendingNavigationResolve.value = null
+  if (mode === 'type') finishTypeChange()
+  if (mode === 'route-type') {
+    const nextDefinition = entryTypes.value.find(item => item.slug === pendingType.value)
+    clearDynamicValues(nextDefinition)
+    type.value = pendingType.value
+    pendingType.value = ''
+    discardDialog.value = null
+  } else if (mode === 'leave') {
+    if (pendingType.value) type.value = pendingType.value
+    pendingType.value = ''
+    discardDialog.value = null
+  }
+  if (resolve) {
+    allowNavigation.value = true
+    resolve(true)
+  }
+}
+
+function cancelDiscard() {
+  const resolve = pendingNavigationResolve.value
+  pendingNavigationResolve.value = null
+  pendingType.value = ''
+  discardDialog.value = null
+  resolve?.(false)
+}
 
 function getErrorMessage(error) {
   const message = error instanceof Error ? error.message.trim() : ''
@@ -54,18 +166,20 @@ function selectTypeFromKeyboard(event) {
 
   event.preventDefault()
   const nextType = entryTypes.value[nextIndex]
-  if (nextType) type.value = nextType.slug
+  if (nextType) changeType(nextType.slug)
   tabs[nextIndex]?.focus()
 }
 
 async function prefillFromEntry(entry) {
   editingId.value = entry.id
+  detailsOpen.value = true
   if (entryTypes.value.some(item => item.slug === entry.type)) {
     type.value = entry.type
   }
   title.value = entry.title || ''
   notes.value = entry.detail || ''
-  score.value = Number(entry.score) || 7
+  const existingScore = Number(entry.score)
+  score.value = Number.isFinite(existingScore) && existingScore >= 1 && existingScore <= 10 ? existingScore : null
   occurredAt.value = toDatetimeLocal(entry.occurredAt) || toDatetimeLocal(new Date())
   Object.keys(values).forEach(key => delete values[key])
   if (entry.values && typeof entry.values === 'object') {
@@ -75,6 +189,7 @@ async function prefillFromEntry(entry) {
       if (knownKeys.has(key)) values[key] = value
     })
   }
+  setInitialDraft()
 }
 
 onMounted(async () => {
@@ -88,6 +203,8 @@ onMounted(async () => {
     } else {
       selectRouteType()
       occurredAt.value = toDatetimeLocal(new Date())
+      detailsOpen.value = false
+      setInitialDraft()
     }
   } finally {
     loading.value = false
@@ -95,19 +212,76 @@ onMounted(async () => {
 })
 watch(() => route.params.id, (id) => {
   editingId.value = null
+  detailsOpen.value = Boolean(id)
+  if (!id) {
+    score.value = null
+    title.value = ''
+    notes.value = ''
+    occurredAt.value = toDatetimeLocal(new Date())
+    Object.keys(values).forEach(key => delete values[key])
+    setInitialDraft()
+  }
   if (id) loadEntry(Number(id)).then(prefillFromEntry)
 })
 watch(() => route.params.type, (t) => {
-  if (!editingId.value) selectRouteType()
+  if (!editingId.value && !allowNavigation.value) selectRouteType()
+  allowNavigation.value = false
 })
+
+onBeforeRouteLeave((_to, _from, next) => requestNavigation(next))
+onBeforeRouteUpdate((to, _from, next) => requestNavigation(next, to))
+
+function fieldId(field) {
+  return `record-field-${field.key}`
+}
+
+function fieldIsInvalid(field) {
+  const value = values[field.key]
+  return saveAttempted.value && field.required && (value === undefined || value === null || value === '')
+}
+
+async function validateForm() {
+  saveAttempted.value = true
+  if (!hasScore.value) {
+    pushToast({
+      type: 'error',
+      message: 'Elegí una sensación del 1 al 10 antes de guardar.',
+      duration: 5000,
+    })
+    await nextTick()
+    scoreInput.value?.focus()
+    return false
+  }
+  const missingField = selectedType.value?.fields.find(field => fieldIsInvalid(field))
+  if (missingField) {
+    pushToast({
+      type: 'error',
+      message: `Completá el campo "${missingField.label}" para guardar.`,
+      duration: 5000,
+    })
+    await nextTick()
+    document.getElementById(fieldId(missingField))?.focus()
+    return false
+  }
+  return true
+}
 
 async function save() {
   if (!selectedType.value) return
+  if (!(await validateForm())) return
+  if (!hasScore.value) {
+    pushToast({
+      type: 'error',
+      message: 'Elegí una sensación del 1 al 10 antes de guardar.',
+      duration: 5000,
+    })
+    return
+  }
   saving.value = true
   try {
     const payload = {
       type: type.value,
-      title: title.value || selectedType.value.name,
+      title: title.value.trim() || selectedType.value.name,
       notes: notes.value,
       score: score.value,
       values,
@@ -123,6 +297,8 @@ async function save() {
       message: editingId.value ? 'Registro actualizado.' : 'Registro creado.',
       duration: 3000,
     })
+    initialDraft.value = null
+    allowNavigation.value = true
     router.push('/historial')
   } catch (error) {
     pushToast({
@@ -148,8 +324,8 @@ async function save() {
         <span></span>
       </div>
     </div>
-    <form v-else-if="selectedType" class="record-form" @submit.prevent="save">
-      <p v-if="journalError" class="form-error" role="alert">{{ journalError }}</p>
+    <form v-else-if="selectedType" class="record-form" novalidate @submit.prevent="save">
+      <p v-if="journalError" id="journal-form-error" class="form-error" role="alert">{{ journalError }}</p>
       <div class="type-tabs" role="tablist" aria-label="Tipo de registro">
         <button
           v-for="item in entryTypes"
@@ -161,34 +337,60 @@ async function save() {
           aria-controls="record-type-panel"
           :tabindex="type === item.slug ? 0 : -1"
           :class="{ active: type === item.slug }"
-          @click="type = item.slug"
+          @click="changeType(item.slug)"
           @keydown="selectTypeFromKeyboard"
         >{{ item.name }}</button>
       </div>
       <div id="record-type-panel" class="score-panel" role="tabpanel" :aria-labelledby="`type-tab-${type}`">
-        <div class="score-panel__copy"><p class="eyebrow">¿CÓMO TE SENTISTE?</p><h2>{{ cat.name }} te acompaña</h2><p>{{ score <= 3 ? 'Hoy costó, y está bien.' : score <= 7 ? 'Tomalo con calma y escuchá tu cuerpo.' : '¡Qué lindo verte así!' }}</p></div>
+        <div v-if="cat" class="score-panel__copy"><p class="eyebrow">¿CÓMO TE SENTISTE?</p><h2>{{ cat.name }} te acompaña</h2><p>{{ score <= 3 ? 'Hoy costó, y está bien.' : score <= 7 ? 'Tomalo con calma y escuchá tu cuerpo.' : '¡Qué lindo verte así!' }}</p></div>
+        <div v-else class="score-panel__copy score-panel__copy--empty"><p class="eyebrow">¿CÓMO TE SENTISTE?</p><h2>¿Cómo te sentiste?</h2><p>Elegí una sensación del 1 al 10.</p></div>
         <Transition name="mood-swap" mode="out-in">
-          <div :key="cat.name" class="score-panel__visual">
+          <div v-if="cat" :key="cat.name" class="score-panel__visual">
             <img :src="cat.image" :alt="`${cat.name}, representación de tu sensación`" />
             <output aria-live="polite">{{ score }}<small>/10</small></output>
           </div>
+          <div v-else key="empty" class="score-panel__visual score-panel__visual--empty">
+            <output aria-live="polite">—<small>/10</small></output>
+          </div>
         </Transition>
       </div>
-      <label class="range-label"><span><b>1</b> Felipa</span><input v-model.number="score" type="range" min="1" max="10" :aria-valuetext="scoreDescription" /><span>Dorito <b>10</b></span></label>
+      <label class="range-label" :class="{ 'range-label--empty': !hasScore }"><span><b>1</b> Felipa</span><input ref="scoreInput" :value="score ?? 1" type="range" min="1" max="10" :aria-invalid="saveAttempted && !hasScore" :aria-describedby="!hasScore ? 'score-help' : undefined" :aria-valuenow="hasScore ? score : undefined" :aria-valuetext="scoreDescription" @input="score = Number($event.target.value)" /><span>Dorito <b>10</b></span></label>
+      <p v-if="!hasScore" class="range-empty-hint">Elegí una sensación para poder guardar.</p>
+      <span id="score-help" class="visually-hidden">Elegí una sensación del 1 al 10 antes de guardar.</span>
       <Transition name="form-content" mode="out-in">
-        <div :key="selectedType.slug" class="form-grid">
-          <label><span>Título</span><input v-model="title" required :placeholder="selectedType.name" /></label>
-          <label v-for="field in selectedType.fields" :key="field.key"><span>{{ field.label }}</span>
-            <textarea v-if="field.inputType === 'textarea'" v-model="values[field.key]" :required="field.required" rows="3"></textarea>
-            <select v-else-if="field.inputType === 'select'" v-model="values[field.key]" :required="field.required"><option value="">Seleccionar</option><option v-for="option in field.options" :key="option" :value="option">{{ option }}</option></select>
-            <input v-else v-model="values[field.key]" :type="field.inputType" :required="field.required" />
+        <div :key="selectedType.slug" class="form-grid quick-fields">
+          <label v-for="field in selectedType.fields" :key="field.key" :for="fieldId(field)"><span>{{ field.label }}</span>
+            <textarea v-if="field.inputType === 'textarea'" :id="fieldId(field)" v-model="values[field.key]" :required="field.required" :aria-invalid="fieldIsInvalid(field)" :aria-describedby="fieldIsInvalid(field) ? `${fieldId(field)}-error` : undefined" rows="3"></textarea>
+            <select v-else-if="field.inputType === 'select'" :id="fieldId(field)" v-model="values[field.key]" :required="field.required" :aria-invalid="fieldIsInvalid(field)" :aria-describedby="fieldIsInvalid(field) ? `${fieldId(field)}-error` : undefined"><option value="">Seleccionar</option><option v-for="option in field.options" :key="option" :value="option">{{ option }}</option></select>
+            <input v-else :id="fieldId(field)" v-model="values[field.key]" :type="field.inputType" :required="field.required" :aria-invalid="fieldIsInvalid(field)" :aria-describedby="fieldIsInvalid(field) ? `${fieldId(field)}-error` : undefined" />
+            <span v-if="fieldIsInvalid(field)" :id="`${fieldId(field)}-error`" class="field-error" role="alert">Este campo es obligatorio.</span>
           </label>
-          <label><span>Fecha y hora</span><input v-model="occurredAt" type="datetime-local" /></label>
-          <label><span>Notas</span><textarea v-model="notes" rows="4" placeholder="Contá un poco más, si querés..."></textarea></label>
         </div>
       </Transition>
-      <div class="form-actions"><RouterLink to="/historial">Cancelar</RouterLink><button class="primary-button" type="submit" :disabled="saving">{{ saving ? 'Guardando…' : (editingId ? 'Guardar cambios' : 'Guardar registro') }}</button></div>
+      <div class="form-actions form-actions--quick"><RouterLink to="/historial">Cancelar</RouterLink><button class="primary-button" type="submit" :disabled="saving">{{ saving ? 'Guardando…' : (editingId ? 'Guardar cambios' : 'Guardar registro') }}</button></div>
+      <details class="optional-details" :open="detailsOpen" @toggle="detailsOpen = $event.target.open">
+        <summary>
+          <span><b>Más detalles</b><small>Podés completarlos ahora o después.</small></span>
+          <span class="optional-details__chevron" aria-hidden="true">⌄</span>
+        </summary>
+        <div class="form-grid optional-details__body">
+          <label><span>Título personalizado <small>(opcional)</small></span><input v-model="title" :placeholder="selectedType.name" /></label>
+          <label><span>Fecha y hora</span><input v-model="occurredAt" type="datetime-local" /></label>
+          <label class="optional-details__notes"><span>Notas <small>(opcional)</small></span><textarea v-model="notes" rows="4" placeholder="Contá un poco más, si querés..."></textarea></label>
+        </div>
+      </details>
     </form>
+    <ConfirmDialog
+      v-if="discardDialog"
+      :title="discardDialog === 'type' || discardDialog === 'route-type' ? '¿Descartar respuestas?' : '¿Descartar cambios?'"
+      :message="discardDialog === 'type' || discardDialog === 'route-type'
+        ? 'Al cambiar el tipo se quitarán las respuestas que no corresponden al nuevo registro.'
+        : 'Tenés cambios sin guardar. Si salís ahora, se perderán.'"
+      cancel-label="Seguir editando"
+      :confirm-label="discardDialog === 'type' || discardDialog === 'route-type' ? 'Descartar respuestas' : 'Descartar cambios'"
+      @confirm="confirmDiscard"
+      @cancel="cancelDiscard"
+    />
   </div>
 </template>
 
@@ -259,6 +461,10 @@ async function save() {
   min-width: 0;
 }
 
+.score-panel__copy--empty h2 {
+  margin-top: 8px;
+}
+
 .score-panel__visual {
   display: flex;
   align-items: center;
@@ -276,9 +482,132 @@ async function save() {
   min-width: 62px;
 }
 
+.score-panel__visual--empty {
+  justify-content: center;
+}
+
+.score-panel__visual--empty output {
+  color: var(--cocoa-500);
+  font-size: 42px;
+}
+
+.range-label--empty input {
+  accent-color: var(--cocoa-400);
+}
+
+.range-label--empty input::-webkit-slider-thumb {
+  visibility: hidden;
+}
+
+.range-label--empty input::-moz-range-thumb {
+  visibility: hidden;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.field-error {
+  display: block;
+  margin-top: 5px;
+  color: var(--danger-600);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.range-empty-hint {
+  margin: -14px 0 18px;
+  color: var(--cocoa-600);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.quick-fields {
+  min-height: 0;
+}
+
 .form-grid label > span {
   color: var(--cocoa-800);
   font-size: 13px;
+}
+
+.form-grid label > span small,
+.optional-details summary small {
+  color: var(--cocoa-500);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.optional-details {
+  margin-top: 18px;
+  border: 1px solid var(--sand-200);
+  border-radius: 16px;
+  background: var(--sand-50);
+}
+
+.optional-details summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 56px;
+  padding: 10px 16px;
+  color: var(--cocoa-800);
+  cursor: pointer;
+  list-style: none;
+}
+
+.optional-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.optional-details summary > span:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.optional-details summary b {
+  color: var(--cocoa-900);
+  font-size: 15px;
+}
+
+.optional-details summary:focus-visible {
+  outline: 3px solid rgba(217, 120, 34, .35);
+  outline-offset: -3px;
+  border-radius: 14px;
+}
+
+.optional-details__chevron {
+  color: var(--dorito-600);
+  font-size: 24px;
+  line-height: 1;
+  transition: transform .18s ease;
+}
+
+.optional-details[open] .optional-details__chevron {
+  transform: rotate(180deg);
+}
+
+.optional-details__body {
+  padding: 0 16px 16px;
+  animation: details-reveal .18s ease both;
+}
+
+.optional-details__notes {
+  grid-column: 1 / -1;
+}
+
+@keyframes details-reveal {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .mood-swap-enter-active,
@@ -361,8 +690,25 @@ async function save() {
     min-height: 44px;
   }
 
+  .range-empty-hint {
+    margin-top: -16px;
+  }
+
   .form-grid {
     gap: 16px;
+  }
+
+  .optional-details {
+    margin-top: 16px;
+  }
+
+  .optional-details summary {
+    min-height: 60px;
+    padding-inline: 14px;
+  }
+
+  .optional-details__body {
+    padding-inline: 14px;
   }
 
   .form-actions {
@@ -407,8 +753,287 @@ async function save() {
   .mood-swap-enter-active,
   .mood-swap-leave-active,
   .form-content-enter-active,
-  .form-content-leave-active {
+  .form-content-leave-active,
+  .optional-details__body {
     transition: none;
+    animation: none;
+  }
+}
+
+/* PersonalJournal: neobrutalismo amable. La composición mantiene el foco en
+   la puntuación y convierte cada respuesta en un bloque fácil de escanear. */
+.form-page .page-header {
+  max-width: 900px;
+  margin-inline: auto;
+  padding-left: 18px;
+  border-left: 6px solid var(--dorito-500);
+}
+
+.form-page .page-header h1 {
+  color: var(--cocoa-950);
+  letter-spacing: -0.03em;
+}
+
+.record-form {
+  max-width: 900px;
+  padding: 30px;
+  border: 3px solid var(--cocoa-950);
+  border-radius: 12px;
+  background: var(--cream-50);
+  box-shadow: 6px 6px 0 var(--cocoa-950);
+}
+
+.record-form--loading {
+  box-shadow: 6px 6px 0 var(--cocoa-950);
+}
+
+.record-form > .form-error {
+  border: 2px solid var(--danger-700);
+  border-left-width: 7px;
+  border-radius: 8px;
+  box-shadow: 3px 3px 0 var(--danger-700);
+}
+
+.type-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 28px;
+  padding: 0;
+  overflow-x: auto;
+  background: transparent;
+}
+
+.type-tabs button {
+  flex: 1 0 max-content;
+  min-height: 48px;
+  padding: 10px 18px;
+  border: 2px solid var(--cocoa-950);
+  border-radius: 8px;
+  color: var(--cocoa-950);
+  background: var(--sand-50);
+  box-shadow: 3px 3px 0 var(--cocoa-950);
+  font-weight: 800;
+  transition: transform .16s ease, box-shadow .16s ease, background-color .16s ease;
+}
+
+.type-tabs button:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0 var(--cocoa-950);
+}
+
+.type-tabs button.active {
+  color: var(--cocoa-950);
+  background: var(--dorito-300);
+  box-shadow: 4px 4px 0 var(--cocoa-950);
+}
+
+.type-tabs button:focus-visible {
+  outline: 3px solid var(--dorito-500);
+  outline-offset: 3px;
+}
+
+.score-panel {
+  min-height: 194px;
+  margin-bottom: 24px;
+  padding: 26px;
+  border: 3px solid var(--cocoa-950);
+  border-radius: 10px;
+  background: var(--dorito-100);
+  box-shadow: 5px 5px 0 var(--cocoa-950);
+}
+
+.score-panel__copy .eyebrow {
+  color: var(--cocoa-950) !important;
+}
+
+.score-panel h2 {
+  color: var(--cocoa-950);
+  letter-spacing: -0.025em;
+}
+
+.score-panel__visual output {
+  color: var(--cocoa-950);
+  text-shadow: 2px 2px 0 var(--dorito-300);
+}
+
+.score-panel__visual img {
+  filter: drop-shadow(4px 4px 0 rgba(36, 29, 25, .16));
+}
+
+.range-label {
+  margin: 24px 0 30px;
+  color: var(--cocoa-950);
+  font-weight: 800;
+}
+
+.range-label input {
+  height: 10px;
+  accent-color: var(--dorito-600);
+}
+
+.range-label input:focus-visible {
+  outline: 3px solid var(--dorito-500);
+  outline-offset: 5px;
+}
+
+.quick-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.quick-fields > label {
+  min-width: 0;
+  padding: 14px;
+  border: 2px solid var(--cocoa-950);
+  border-left: 7px solid var(--felicia-500);
+  border-radius: 8px;
+  background: var(--cream-50);
+  box-shadow: 3px 3px 0 var(--cocoa-950);
+}
+
+.quick-fields > label:nth-child(3n + 2) {
+  border-left-color: var(--dorito-500);
+}
+
+.quick-fields > label:nth-child(3n + 3) {
+  border-left-color: var(--felipa-500, var(--danger-500));
+}
+
+.form-grid label > span {
+  color: var(--cocoa-950);
+  font-weight: 800;
+}
+
+.form-grid input,
+.form-grid textarea,
+.form-grid select {
+  border: 2px solid var(--cocoa-950);
+  border-radius: 6px;
+  background: var(--sand-50);
+}
+
+.form-grid :is(input, textarea, select):focus-visible {
+  outline: 3px solid var(--dorito-500);
+  outline-offset: 3px;
+}
+
+.form-actions {
+  margin-top: 30px;
+  padding-top: 18px;
+  border-top: 3px solid var(--cocoa-950);
+}
+
+.form-actions > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 2px solid var(--cocoa-950);
+  border-radius: 7px;
+  color: var(--cocoa-950);
+  background: var(--cream-50);
+  box-shadow: 3px 3px 0 var(--cocoa-950);
+  font-weight: 800;
+}
+
+.form-actions > a:hover {
+  color: var(--cocoa-950);
+  text-decoration: none;
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0 var(--cocoa-950);
+}
+
+.form-actions .primary-button {
+  border: 2px solid var(--cocoa-950);
+  border-radius: 7px;
+  color: var(--cocoa-950);
+  background: var(--dorito-300);
+  box-shadow: 4px 4px 0 var(--cocoa-950);
+}
+
+.form-actions .primary-button:hover {
+  color: var(--cocoa-950);
+  background: var(--dorito-400);
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--cocoa-950);
+}
+
+.form-actions .primary-button:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--cocoa-950);
+}
+
+.optional-details {
+  border: 2px solid var(--cocoa-950);
+  border-radius: 8px;
+  background: var(--felicia-100);
+  box-shadow: 3px 3px 0 var(--cocoa-950);
+}
+
+.optional-details summary {
+  color: var(--cocoa-950);
+}
+
+.optional-details summary b {
+  color: var(--cocoa-950);
+}
+
+.optional-details summary:focus-visible {
+  outline-color: var(--dorito-500);
+}
+
+@media (max-width: 700px) {
+  .record-form {
+    padding: 20px;
+  }
+
+  .quick-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .form-page .page-header {
+    padding-left: 12px;
+  }
+
+  .record-form {
+    border-width: 2px;
+    box-shadow: 4px 4px 0 var(--cocoa-950);
+  }
+
+  .type-tabs button {
+    box-shadow: 2px 2px 0 var(--cocoa-950);
+  }
+
+  .score-panel {
+    padding: 18px;
+    box-shadow: 3px 3px 0 var(--cocoa-950);
+  }
+
+  .quick-fields > label {
+    box-shadow: 2px 2px 0 var(--cocoa-950);
+  }
+
+  .form-actions {
+    border-top: 2px solid var(--cocoa-950);
+    background: var(--cream-50);
+    box-shadow: 4px 4px 0 var(--cocoa-950);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .type-tabs button,
+  .form-actions > a,
+  .form-actions .primary-button {
+    transition: none;
+  }
+
+  .type-tabs button:hover,
+  .form-actions > a:hover,
+  .form-actions .primary-button:hover,
+  .form-actions .primary-button:active {
+    transform: none;
   }
 }
 </style>

@@ -9,7 +9,7 @@ async function request(path, options = {}) {
   return body
 }
 
-const apiBase = `${import.meta.env.BASE_URL}api`
+const apiBase = `${import.meta.env?.BASE_URL ?? '/'}api`
 
 function toQuery(params = {}) {
   const search = new URLSearchParams()

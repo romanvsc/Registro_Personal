@@ -1,66 +1,56 @@
-# Design QA — Login
+# Design QA — Sistema neobrutalista amable 1.2.0
 
-**Source visual truth**
+## Source visual truth
 
-- Conversation attachment: desktop login reference supplied by the user.
-- Source dimensions: 1536 × 1024 px.
-- Intended comparison viewport: 1536 × 1024 CSS px at device scale factor 1.
-- State: initial login form, password hidden, no validation error.
+- Conversation source: ImageGen ideation option 3, the selected neo-brutalist friendly direction.
+- Source visual dimensions: 1440 × 1024 px concept shown inline in the conversation; no separate source file was created.
+- Intent used for comparison: warm paper canvas, cocoa ink, editorial rails, flat semantic blocks, offset shadows and a horizontal hero.
 
-**Implementation evidence**
+## Implementation evidence
 
-- Route: `http://127.0.0.1:5173/login`.
-- Implementation screenshot path: unavailable.
-- Browser-rendered CSS size and pixel dimensions: unavailable.
-- Density normalization: not possible without a browser capture.
+- Local route used for capture: `http://127.0.0.1:5125/registro_gatos/`.
+- Capture method: Edge CUA browser, inline screenshots reviewed in this turn.
+- Desktop viewport: 1440 × 1000 CSS px, default device scale factor.
+- Mobile viewport: 390 × 844 CSS px, default device scale factor.
+- States: authenticated synthetic `Usuario Demo`, 36 journal entries, 20 trend points, three active types; public login/register states were also captured after synthetic logout.
+- The API was a temporary mock process. No backend, database or `backend/config.php` was changed.
 
-**Findings**
+## Full-view comparison evidence
 
-- [P0] Browser-rendered comparison unavailable
-  - Location: complete login screen.
-  - Evidence: neither the in-app browser nor Chrome is available in this session, so the implementation could not be captured at the reference viewport.
-  - Impact: typography, spacing, crop, responsive behavior and interaction states cannot be visually accepted against the reference.
-  - Fix: open `/login` in an available browser at 1536 × 1024, capture it, place it beside the supplied reference, then run the visual comparison loop.
+- Dashboard desktop top and lower scroll: hero remains the focal point; summary, trend, quick actions and wellbeing use distinct semantic blocks rather than uniform white cards.
+- Dashboard mobile: header, hero, summary and trend reflow without horizontal overflow.
+- Record desktop and mobile: active type tabs, score panel, dynamic field rail and action bar share the same border/shadow language.
+- History, type administration and profile: rails, separators, cocoa borders and orange primary actions remain consistent.
+- Login and register desktop/mobile: public surfaces use the same palette, field borders, focus treatment and CTA hierarchy.
+- The comparison was performed against the inline source direction and the inline implementation captures; no composite image artifact was required because the source exists only in the conversation.
 
-**Required fidelity surfaces**
+## Focused-region evidence
 
-- Fonts and typography: implemented with Nunito and DM Sans; visual comparison blocked.
-- Spacing and layout rhythm: implemented as a two-column desktop layout with responsive single-column mobile layout; visual comparison blocked.
-- Colors and visual tokens: uses the approved cream, sand, cocoa, Dorito, Felicia and Felipa palette; visual comparison blocked.
-- Image quality and asset fidelity: revised group portrait saved at `public/auth/cats-login-hero-v2.png`; hard arch removed and outer background changed to cream; final browser comparison blocked.
-- Copy and content: adapted from the reference to the existing `Mi registro` product and Rioplatense Spanish.
+- Hero: 3 px cocoa border, solid offset shadow and warm flat surface; cat and score remain visually dominant.
+- Trend: lavender editorial block with visible date range, textual summary and horizontal-scroll hint.
+- Journal score panel: orange focal surface with a genuine empty score state and no competing animation.
+- Navigation and menus: cocoa rule, orange active block, compact seals/icons and bounded playful hover.
+- Dialogs, toasts and version badge: semantic rails, solid shadows and preserved keyboard semantics.
 
-**Interaction checks**
+## Findings
 
-- Source-level behavior implemented: required-field message, password visibility toggle, loading state, demo-session persistence and navigation to dashboard.
-- Browser interaction test: blocked because no browser surface is available.
-- Console errors: not checked for the same reason.
+- No remaining P0, P1 or P2 visual findings after the final pass.
+- Known pre-existing copy/encoding artifacts such as `Estado de ?nimo` remain outside this presentation-only iteration; historical text/data repair was intentionally not included.
 
-**Full-view comparison evidence**
+## Comparison history
 
-- Source reference opened in the conversation.
-- No implementation screenshot could be captured, so a combined side-by-side comparison was not possible.
+- Initial 1.2.0 record capture exposed a P2 horizontal overflow in the journal submenu after adding offset shadows/transforms.
+- Fixed the issue in `JournalNavigation.vue` with bounded menu overflow, `min-width: 0` links and right padding that preserves the shadow inside the rail.
+- Post-fix desktop capture measured document and body widths equal to the viewport; the journal menu reported `scrollWidth === clientWidth` with `overflow-x: hidden`.
+- Mobile dashboard capture measured no horizontal overflow at 390 px. Reduced-motion capture reported decorative hero/cat animations as `none` while preserving the same layout.
 
-**Focused region comparison evidence**
+## Acceptance checks
 
-- Not performed because the required full implementation capture is unavailable.
+- Routes captured: `/login`, `/registro`, `/`, `/registrar/comida`, `/historial`, `/configuracion/tipos` and `/perfil`.
+- Viewports captured: 390 × 844 and 1440 × 1000.
+- `v1.2.0` is visible in the application.
+- No horizontal scroll at the primary mobile viewport.
+- Focus styling, keyboard-oriented controls, dialog Escape/focus restoration, alert semantics and reduced-motion policy remain present.
+- Build, focused motion/insights/toast/journal/identity/trend tests and `git diff --check` passed.
 
-**Comparison history**
-
-- Iteration 1: implementation completed and production build passed; visual capture blocked before the first comparison.
-- Iteration 2: user evidence showed a P1 hard arch/crop around the portrait. Replaced the orange background with a cream version, removed the arch and reduced the transition to a soft lower fade. Post-fix browser capture remains unavailable.
-- Iteration 3: user evidence still showed a P1 rectangular color boundary. Sampled the image edges (`#FDF7EC`), matched the panel background to that value and added intersecting horizontal/vertical masks so all four image edges fade into the panel. Post-fix browser capture remains unavailable.
-
-**Implementation checklist**
-
-- Capture `/login` at 1536 × 1024.
-- Compare overall two-column proportions and hero crop.
-- Compare form-card width, padding, typography and vertical rhythm.
-- Test password toggle, empty submit, valid submit and mobile breakpoint.
-- Check browser console and repeat after P0/P1/P2 fixes.
-
-**Follow-up polish**
-
-- Evaluate whether the generated portrait needs a slightly lower crop after the first browser capture.
-
-final result: blocked
+final result: passed

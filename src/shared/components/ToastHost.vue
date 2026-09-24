@@ -49,10 +49,11 @@ function iconFor(type) {
   gap: 12px;
   width: 100%;
   padding: 13px 14px;
-  border: 1px solid var(--sand-300);
-  border-radius: 14px;
-  background: var(--cream-50, #fffdf7);
-  box-shadow: 0 14px 40px rgba(40, 28, 20, 0.22);
+  border: 2px solid var(--neo-ink, #211914);
+  border-left: 7px solid var(--felicia-500, #6e7533);
+  border-radius: var(--neo-radius-sm, 7px);
+  background: var(--neo-paper, #fffaf1);
+  box-shadow: 5px 5px 0 var(--neo-ink, #211914);
   animation: toast-in 0.25s ease;
 }
 
@@ -66,8 +67,10 @@ function iconFor(type) {
   background: var(--sage-100, #e3efe4);
 }
 
-.toast--error .toast__icon { background: var(--danger-100, #f6ddda); }
-.toast--warning .toast__icon { background: #fbe9d3; }
+.toast--error { border-left-color: var(--neo-coral, #e15a49); }
+.toast--warning { border-left-color: var(--neo-orange, #ef6b1d); }
+.toast--error .toast__icon { background: var(--danger-100, #ffd7d1); }
+.toast--warning .toast__icon { background: var(--dorito-100, #ffd7ae); }
 
 .toast p {
   flex: 1;

@@ -133,4 +133,15 @@ watch(() => route.fullPath, () => close())
   .account-menu-enter-active, .account-menu-leave-active { transform-origin: bottom center; }
 }
 @media (prefers-reduced-motion: reduce) { .account-menu__trigger > svg, .account-menu-enter-active, .account-menu-leave-active, .account-backdrop-enter-active, .account-backdrop-leave-active { transition: none; } }
+
+/* Neo-brutalist account control: compact and unmistakably interactive. */
+.account-menu__trigger { border: 2px solid transparent; border-radius: 9px; }
+.account-menu__trigger:hover, .account-menu__trigger[aria-expanded="true"] { border-color: var(--cocoa-950); background: var(--dorito-100); box-shadow: 3px 3px 0 var(--cocoa-950); }
+.account-menu__popover { padding: 9px; border: 2px solid var(--cocoa-950); border-radius: 10px; background: var(--cream-50); box-shadow: 5px 5px 0 var(--cocoa-950); }
+.account-menu__identity { border-bottom: 2px solid var(--cocoa-950); }
+.account-menu__popover > button { border: 2px solid transparent; border-radius: 7px; }
+.account-menu__popover > button:hover, .account-menu__popover > button:focus-visible { border-color: var(--cocoa-950); color: var(--cocoa-950); background: var(--lavender-100, #ece8ff); box-shadow: 2px 2px 0 var(--cocoa-950); }
+.account-menu__popover > .account-menu__logout { color: var(--danger-700, #874033); }
+.account-menu__popover > .account-menu__logout:hover, .account-menu__popover > .account-menu__logout:focus-visible { color: var(--danger-700, #874033); background: var(--danger-50, #fff0ec); }
+@media (prefers-reduced-motion: reduce) { .account-menu__trigger, .account-menu__popover > button { transition: none; } }
 </style>

@@ -15,11 +15,11 @@ const version = packageMetadata.version
   bottom: 7px;
   z-index: 8;
   padding: 2px 6px;
-  border: 1px solid rgba(229, 219, 207, .72);
-  border-radius: 999px;
-  color: var(--cocoa-600, #756357);
-  background: rgba(255, 252, 247, .88);
-  box-shadow: 0 2px 8px rgba(76, 61, 47, .05);
+  border: 2px solid var(--neo-ink, #211914);
+  border-radius: 5px;
+  color: var(--neo-ink, #211914);
+  background: var(--neo-butter, #ffe39a);
+  box-shadow: 2px 2px 0 var(--neo-ink, #211914);
   font-size: 10.5px;
   font-variant-numeric: tabular-nums;
   font-weight: 700;

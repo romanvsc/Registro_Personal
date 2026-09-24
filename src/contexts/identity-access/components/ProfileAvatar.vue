@@ -57,4 +57,8 @@ const accessibleLabel = computed(() => `Avatar de ${displayName.value}`)
   font: 800 calc(var(--avatar-size) * .34)/1 Nunito, sans-serif;
   letter-spacing: -.03em;
 }
+
+/* Avatars stay round; their cocoa keyline ties them to the new system. */
+.profile-avatar { border: 3px solid var(--cocoa-950, #302720); background: var(--dorito-100, #ffe0bd); box-shadow: 3px 3px 0 var(--cocoa-950, #302720); }
+.profile-avatar--sm { border-width: 2px; box-shadow: 2px 2px 0 var(--cocoa-950, #302720); }
 </style>

@@ -43,6 +43,7 @@ Importar en phpMyAdmin, en este orden:
 2. `backend/src/PersonalJournal/Infrastructure/Persistence/Migrations/20260809_create_parameterized_journal.sql`
 3. `backend/src/PersonalJournal/Infrastructure/Persistence/Migrations/20260813_scope_entry_types_by_user.sql`
 4. `backend/src/IdentityAccess/Infrastructure/Persistence/Migrations/20260814_create_password_reset_tokens.sql`
+5. `backend/src/PersonalJournal/Infrastructure/Persistence/Migrations/20260816_convert_journal_to_utf8mb4.sql`
 
 Los `CREATE TABLE IF NOT EXISTS` y los `ON DUPLICATE KEY UPDATE` hacen que las migraciones sean idempotentes.
 

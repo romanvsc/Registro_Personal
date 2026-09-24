@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { journalApi } from '../infrastructure/journalApi'
+import { refreshEntryTypes } from './journalStore'
 
 export const adminEntryTypes = ref([])
 export const adminTypesLoading = ref(false)
@@ -27,6 +28,7 @@ export async function createEntryType(payload) {
   adminTypesError.value = ''
   const { type } = await journalApi.createType(payload)
   await loadAdminEntryTypes()
+  await refreshEntryTypes()
   return type
 }
 
@@ -34,6 +36,7 @@ export async function updateEntryType(id, payload) {
   adminTypesError.value = ''
   const { type } = await journalApi.updateType(id, payload)
   await loadAdminEntryTypes()
+  await refreshEntryTypes()
   return type
 }
 
@@ -41,5 +44,6 @@ export async function deleteEntryType(id) {
   adminTypesError.value = ''
   const result = await journalApi.deleteType(id)
   await loadAdminEntryTypes()
+  await refreshEntryTypes()
   return result
 }

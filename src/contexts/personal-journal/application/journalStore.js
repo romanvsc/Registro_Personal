@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import { journalApi } from '../infrastructure/journalApi'
+import { journalApi } from '../infrastructure/journalApi.js'
 
 export const entries = ref([])
 export const entryTypes = ref([])
@@ -7,7 +7,7 @@ export const journalLoading = ref(false)
 export const journalError = ref('')
 let entryTypesRequest = null
 
-const assetsBase = import.meta.env.BASE_URL
+const assetsBase = import.meta.env?.BASE_URL ?? '/'
 
 export function catFor(score) {
   if (score <= 3) return { name: 'Felipa', mood: 'malhumorada', image: `${assetsBase}cats/felipa-molesta.png`, color: 'rose' }
@@ -28,6 +28,18 @@ export async function loadEntryTypes() {
       })
   }
   return entryTypesRequest
+}
+
+/**
+ * Invalidates the active type projection after an administrative mutation.
+ * The admin list includes inactive types, while the journal projection must
+ * only expose types that can receive a new entry.
+ */
+export async function refreshEntryTypes() {
+  entryTypesRequest = null
+  const types = await journalApi.listTypes()
+  entryTypes.value = types
+  return types
 }
 
 export async function loadJournal() {

@@ -9,6 +9,7 @@ import AppVersion from './shared/components/AppVersion.vue'
 import AccountMenu from './contexts/identity-access/components/AccountMenu.vue'
 import { sessionStore } from './contexts/identity-access/application/sessionStore'
 import JournalNavigation from './contexts/personal-journal/components/JournalNavigation.vue'
+import { MOTION, createMotionContext, prefersReducedMotion, gsap } from './shared/motion/gsap'
 
 const menuOpen = ref(false)
 const menuButton = ref(null)
@@ -29,10 +30,56 @@ const recordTheme = computed(() => {
   if (route.path.startsWith('/registrar/animo')) return 'records-theme--mood'
   return ''
 })
+const isDashboard = computed(() => route.path === '/')
 const recordPatternStyle = computed(() => {
   const icon = recordPatternIcons[route.params.type]
   return icon ? { '--record-pattern': `url("${assetsBase}icons/${icon}")` } : undefined
 })
+
+function animateRouteEnter(element, done) {
+  if (prefersReducedMotion()) {
+    done()
+    return
+  }
+
+  let context
+  context = createMotionContext(element, () => {
+    gsap.fromTo(element,
+      { opacity: 0, y: 6 },
+      {
+        opacity: 1,
+        y: 0,
+        duration: MOTION.duration.route,
+        ease: MOTION.ease.enter,
+        onComplete: () => {
+          context?.revert()
+          done()
+        },
+      },
+    )
+  })
+}
+
+function animateRouteLeave(element, done) {
+  if (prefersReducedMotion()) {
+    done()
+    return
+  }
+
+  let context
+  context = createMotionContext(element, () => {
+    gsap.to(element, {
+      opacity: 0,
+      y: -4,
+      duration: MOTION.duration.route,
+      ease: MOTION.ease.leave,
+      onComplete: () => {
+        context?.revert()
+        done()
+      },
+    })
+  })
+}
 
 function closeMenu({ restoreFocus = false } = {}) {
   menuOpen.value = false
@@ -92,11 +139,17 @@ async function signOut() {
 
 <template>
   <RouterView v-if="route.meta.publicLayout" v-slot="{ Component, route: viewRoute }">
-    <Transition name="page-view" mode="out-in">
+    <Transition
+      name="page-view"
+      mode="in-out"
+      :css="false"
+      @enter="animateRouteEnter"
+      @leave="animateRouteLeave"
+    >
       <component :is="Component" :key="viewRoute.path" />
     </Transition>
   </RouterView>
-  <div v-else class="app-shell">
+  <div v-else class="app-shell app-shell--neo">
     <header class="mobile-header">
       <button
         ref="menuButton"
@@ -136,9 +189,15 @@ async function signOut() {
       </div>
       <AccountMenu v-if="user" :user="user" @edit-profile="editProfile" @logout="signOut" />
     </aside>
-    <main :class="recordTheme" :style="recordPatternStyle" :inert="menuOpen ? '' : null" :aria-hidden="menuOpen ? 'true' : null">
+    <main :class="[recordTheme, 'neo-main', { 'dashboard-theme': isDashboard }]" :style="recordPatternStyle" :inert="menuOpen ? '' : null" :aria-hidden="menuOpen ? 'true' : null">
       <RouterView v-slot="{ Component, route: viewRoute }">
-        <Transition name="page-view" mode="out-in">
+        <Transition
+          name="page-view"
+          mode="in-out"
+          :css="false"
+          @enter="animateRouteEnter"
+          @leave="animateRouteLeave"
+        >
           <component :is="Component" :key="viewRoute.path" />
         </Transition>
       </RouterView>

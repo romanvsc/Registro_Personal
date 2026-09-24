@@ -7,6 +7,7 @@ import {
   adminTypesLoading,
   deleteEntryType,
   loadAdminEntryTypes,
+  updateEntryType,
 } from '../application/entryTypeAdminStore'
 import { pushToast } from '../../../shared/application/toastStore'
 import AppIcon from '../../../shared/components/AppIcon.vue'
@@ -18,6 +19,7 @@ const base = import.meta.env.BASE_URL
 const deleting = ref(null)
 const deletingBusy = ref(false)
 const deleteMessage = ref('')
+const reactivating = ref(null)
 
 function getErrorMessage(error, fallback) {
   const message = error instanceof Error ? error.message.trim() : ''
@@ -55,6 +57,27 @@ async function runDelete() {
   }
 }
 
+async function reactivate(type) {
+  if (reactivating.value !== null) return
+  reactivating.value = type.id
+  try {
+    await updateEntryType(type.id, { active: true })
+    pushToast({
+      type: 'success',
+      message: 'Tipo reactivado.',
+      duration: 3000,
+    })
+  } catch (error) {
+    pushToast({
+      type: 'error',
+      message: getErrorMessage(error, 'No se pudo reactivar el tipo.'),
+      duration: 5000,
+    })
+  } finally {
+    reactivating.value = null
+  }
+}
+
 function cancelDelete() {
   deleting.value = null
   deleteMessage.value = ''
@@ -67,7 +90,7 @@ onMounted(loadAdminEntryTypes)
 <template>
   <div class="page admin-page" :aria-busy="adminTypesLoading">
     <header class="page-header">
-      <div><p class="eyebrow">CONFIGURACIÓN</p><h1>Tipos de registro</h1><p>Definí qué momentos querés registrar y con qué campos.</p></div>
+      <div><p class="eyebrow">CONFIGURACIÓN</p><h1>Tipos de registro</h1><p>Elegí qué momentos querés guardar y qué preguntas querés responder.</p></div>
       <RouterLink class="primary-button" to="/configuracion/tipos/nuevo"><AppIcon name="nuevo-registro" /> Nuevo tipo</RouterLink>
     </header>
 
@@ -82,12 +105,24 @@ onMounted(loadAdminEntryTypes)
         <span class="type-admin-card__icon"><AppIcon :name="type.icon" /></span>
         <div class="type-admin-card__body">
           <h2>{{ type.name }} <small v-if="!type.active" class="inactive-badge">Inactivo</small></h2>
-          <p>{{ type.slug }} · {{ type.fields.length }} campo{{ type.fields.length === 1 ? '' : 's' }}</p>
+          <p>{{ type.fields.length }} pregunta{{ type.fields.length === 1 ? '' : 's' }}</p>
           <span class="field-chips"><em v-for="field in type.fields" :key="field.key">{{ field.label }}</em></span>
         </div>
         <div class="type-admin-card__actions">
           <RouterLink class="mini-link" :to="`/configuracion/tipos/${type.id}`">Editar</RouterLink>
-          <button class="mini-link mini-link--danger" type="button" @click="confirmDelete(type)">Eliminar</button>
+          <button
+            v-if="type.active"
+            class="mini-link mini-link--danger"
+            type="button"
+            @click="confirmDelete(type)"
+          >Eliminar</button>
+          <button
+            v-else
+            class="mini-link"
+            type="button"
+            :disabled="reactivating === type.id"
+            @click="reactivate(type)"
+          >{{ reactivating === type.id ? 'Reactivando…' : 'Reactivar' }}</button>
         </div>
       </article>
     </div>
@@ -226,6 +261,201 @@ onMounted(loadAdminEntryTypes)
 
   .type-admin-card__actions .mini-link {
     flex: 1;
+  }
+}
+
+/* PersonalJournal: catálogo modular con bloques, rails y sombras sólidas. */
+.admin-page .page-header {
+  padding-left: 18px;
+  border-left: 6px solid var(--dorito-500);
+}
+
+.admin-page .page-header h1 {
+  color: var(--cocoa-950);
+  letter-spacing: -0.03em;
+}
+
+.admin-page .page-header .primary-button {
+  border: 2px solid var(--cocoa-950);
+  border-radius: 7px;
+  color: var(--cocoa-950);
+  background: var(--dorito-300);
+  box-shadow: 4px 4px 0 var(--cocoa-950);
+}
+
+.admin-page .page-header .primary-button:hover {
+  color: var(--cocoa-950);
+  background: var(--dorito-400);
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--cocoa-950);
+}
+
+.type-admin-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.type-admin-card {
+  min-width: 0;
+  padding: 20px;
+  border: 3px solid var(--cocoa-950);
+  border-left-width: 8px;
+  border-radius: 10px;
+  border-left-color: var(--dorito-500);
+  background: var(--cream-50);
+  box-shadow: 5px 5px 0 var(--cocoa-950);
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+
+.type-admin-card:nth-child(3n + 2) {
+  border-left-color: var(--felicia-500);
+  background: var(--felicia-50);
+}
+
+.type-admin-card:nth-child(3n + 3) {
+  border-left-color: var(--dorito-400);
+  background: var(--dorito-50);
+}
+
+.type-admin-card:hover {
+  transform: translate(-3px, -3px);
+  box-shadow: 8px 8px 0 var(--cocoa-950);
+}
+
+.type-admin-card.is-inactive {
+  opacity: .76;
+  border-left-color: var(--cocoa-600);
+  background: repeating-linear-gradient(-45deg, var(--sand-50), var(--sand-50) 8px, var(--sand-100) 8px, var(--sand-100) 16px);
+}
+
+.type-admin-card__icon {
+  width: 52px;
+  height: 52px;
+  border: 2px solid var(--cocoa-950);
+  border-radius: 8px;
+  background: var(--cream-50);
+  box-shadow: 3px 3px 0 var(--cocoa-950);
+}
+
+.type-admin-card__icon .app-icon {
+  width: 48px;
+  height: 48px;
+}
+
+.type-admin-card h2 {
+  color: var(--cocoa-950);
+  letter-spacing: -0.01em;
+}
+
+.type-admin-card h2 small {
+  padding: 3px 7px;
+  border: 2px solid var(--cocoa-950);
+  border-radius: 5px;
+  color: var(--cocoa-950);
+  background: var(--sand-100);
+  font-weight: 800;
+}
+
+.field-chips {
+  gap: 7px;
+}
+
+.field-chips em {
+  padding: 5px 9px;
+  border: 1px solid var(--cocoa-700);
+  border-radius: 5px;
+  color: var(--cocoa-950);
+  background: var(--cream-50);
+  font-weight: 700;
+}
+
+.type-admin-card__actions {
+  gap: 8px;
+}
+
+.type-admin-card__actions .mini-link {
+  min-width: 82px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 2px solid var(--cocoa-950);
+  border-radius: 6px;
+  color: var(--cocoa-950);
+  background: var(--cream-50);
+  box-shadow: 3px 3px 0 var(--cocoa-950);
+  font-weight: 800;
+}
+
+.type-admin-card__actions .mini-link:hover {
+  color: var(--cocoa-950);
+  background: var(--dorito-100);
+  text-decoration: none;
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0 var(--cocoa-950);
+}
+
+.type-admin-card__actions .mini-link--danger {
+  border-color: var(--danger-700);
+  color: var(--danger-700);
+  box-shadow: 3px 3px 0 var(--danger-700);
+}
+
+.type-admin-card__actions .mini-link--danger:hover {
+  color: var(--danger-700);
+  background: var(--danger-50);
+  box-shadow: 5px 5px 0 var(--danger-700);
+}
+
+.entry-list-empty {
+  border: 3px dashed var(--cocoa-950);
+  border-radius: 10px;
+  background: var(--felicia-50);
+  box-shadow: 5px 5px 0 var(--cocoa-950);
+}
+
+.entry-list-empty .primary-button {
+  border: 2px solid var(--cocoa-950);
+  border-radius: 6px;
+  color: var(--cocoa-950);
+  background: var(--dorito-300);
+  box-shadow: 3px 3px 0 var(--cocoa-950);
+}
+
+@media (max-width: 720px) {
+  .type-admin-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .admin-page .page-header {
+    padding-left: 12px;
+  }
+
+  .type-admin-card {
+    box-shadow: 4px 4px 0 var(--cocoa-950);
+  }
+
+  .type-admin-card:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 var(--cocoa-950);
+  }
+
+  .type-admin-card__actions {
+    border-top: 2px solid var(--cocoa-950);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .type-admin-card,
+  .type-admin-card__actions .mini-link,
+  .admin-page .page-header .primary-button {
+    transition: none;
+  }
+
+  .type-admin-card:hover,
+  .type-admin-card__actions .mini-link:hover,
+  .admin-page .page-header .primary-button:hover {
+    transform: none;
   }
 }
 </style>

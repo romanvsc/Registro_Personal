@@ -12,6 +12,7 @@ import ForgotPasswordView from './contexts/identity-access/views/ForgotPasswordV
 import ResetPasswordView from './contexts/identity-access/views/ResetPasswordView.vue'
 import ProfileView from './contexts/identity-access/views/ProfileView.vue'
 import { sessionStore } from './contexts/identity-access/application/sessionStore'
+import { getSafeRedirect } from './contexts/identity-access/application/safeRedirect'
 import './styles.css'
 
 const router = createRouter({
@@ -33,7 +34,7 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   const user = await sessionStore.restore()
-  if (to.meta.publicLayout) return user ? '/' : true
+  if (to.meta.publicLayout) return user ? getSafeRedirect(to.query.redirect) : true
   return user ? true : { path: '/login', query: { redirect: to.fullPath } }
 })
 

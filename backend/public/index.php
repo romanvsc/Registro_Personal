@@ -75,11 +75,15 @@ try {
     $dsn = getenv('DB_DSN') ?: ($fileConfig['dsn'] ?? 'mysql:host=127.0.0.1;port=3306;dbname=registro_personal;charset=utf8mb4');
     $user = getenv('DB_USER') ?: ($fileConfig['user'] ?? 'root');
     $password = getenv('DB_PASSWORD') ?: ($fileConfig['password'] ?? '');
-    $pdo = new PDO($dsn, $user, $password, [
+    $pdoOptions = [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false,
-    ]);
+    ];
+    if (defined('PDO::MYSQL_ATTR_INIT_COMMAND') && str_starts_with(strtolower($dsn), 'mysql:')) {
+        $pdoOptions[PDO::MYSQL_ATTR_INIT_COMMAND] = 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci';
+    }
+    $pdo = new PDO($dsn, $user, $password, $pdoOptions);
     $types = new PdoEntryTypeRepository($pdo);
     $entries = new PdoJournalEntryRepository($pdo);
     $users = new PdoUserRepository($pdo);
