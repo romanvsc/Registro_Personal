@@ -29,10 +29,10 @@ const version = packageMetadata.version
   user-select: none;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 900px) {
   .app-version {
-    right: 7px;
-    bottom: 5px;
+    right: 12px;
+    bottom: calc(98px + env(safe-area-inset-bottom));
     font-size: 10px;
   }
 }

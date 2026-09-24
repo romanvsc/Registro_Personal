@@ -12,9 +12,25 @@ export const MOTION = Object.freeze({
     filterClose: 0.18,
   }),
   ease: Object.freeze({
-    standard: 'power2.out',
-    enter: 'power2.out',
+    // A short power curve keeps the neo movement physical without a bounce.
+    standard: 'power1.out',
+    enter: 'power1.out',
     leave: 'power1.in',
+  }),
+  offset: Object.freeze({
+    routeEnter: 10,
+    routeLeave: -6,
+    reveal: 10,
+  }),
+  rotation: Object.freeze({
+    routeEnter: 0.7,
+    routeLeave: -0.5,
+    reveal: 0.8,
+  }),
+  scale: Object.freeze({
+    routeEnter: 0.995,
+    routeLeave: 0.998,
+    reveal: 0.99,
   }),
   stagger: 0.04,
 })

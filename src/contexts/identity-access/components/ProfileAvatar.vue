@@ -28,21 +28,6 @@ const accessibleLabel = computed(() => `Avatar de ${displayName.value}`)
 </template>
 
 <style scoped>
-.profile-avatar {
-  --avatar-size: 48px;
-  display: inline-grid;
-  place-items: center;
-  overflow: hidden;
-  width: var(--avatar-size);
-  height: var(--avatar-size);
-  flex: none;
-  border: 2px solid var(--cream-50, #fffcf7);
-  border-radius: 50%;
-  background: linear-gradient(145deg, var(--dorito-100), var(--cream-100));
-  box-shadow: 0 3px 12px rgba(76, 61, 47, .14);
-}
-
-.profile-avatar--sm { --avatar-size: 36px; }
 .profile-avatar--lg { --avatar-size: 72px; }
 .profile-avatar--xl { --avatar-size: 116px; }
 
@@ -54,11 +39,19 @@ const accessibleLabel = computed(() => `Avatar de ${displayName.value}`)
 
 .profile-avatar__initials {
   color: var(--cocoa-900, #302720);
-  font: 800 calc(var(--avatar-size) * .34)/1 Nunito, sans-serif;
+  font: 800 calc(var(--avatar-size) * .34)/1 var(--font-display);
   letter-spacing: -.03em;
 }
 
 /* Avatars stay round; their cocoa keyline ties them to the new system. */
-.profile-avatar { border: 3px solid var(--cocoa-950, #302720); background: var(--dorito-100, #ffe0bd); box-shadow: 3px 3px 0 var(--cocoa-950, #302720); }
-.profile-avatar--sm { border-width: 2px; box-shadow: 2px 2px 0 var(--cocoa-950, #302720); }
+.profile-avatar {
+  --avatar-size: 48px;
+  display: inline-grid;
+  place-items: center;
+  overflow: hidden;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  flex: none; border: 3px solid var(--cocoa-950, #302720);
+  border-radius: 50%; background: var(--dorito-100, #ffe0bd); box-shadow: 3px 3px 0 var(--cocoa-950, #302720); }
+.profile-avatar--sm { --avatar-size: 36px; border-width: 2px; box-shadow: 2px 2px 0 var(--cocoa-950, #302720); }
 </style>

@@ -108,40 +108,39 @@ watch(() => route.fullPath, () => close())
 
 <style scoped>
 .account-menu { position: relative; }
-.account-menu__trigger { display: flex; align-items: center; gap: 10px; min-height: 48px; max-width: 260px; padding: 5px 8px 5px 6px; border: 1px solid transparent; border-radius: 15px; color: var(--cocoa-900); background: transparent; cursor: pointer; text-align: left; }
-.account-menu__trigger:hover, .account-menu__trigger[aria-expanded="true"] { border-color: var(--sand-200); background: var(--cream-50); }
 .account-menu__text { min-width: 0; flex: 1; }
-.account-menu strong, .account-menu small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.account-menu strong { font-size: 14px; }.account-menu small { margin-top: 2px; color: var(--cocoa-600); font-size: 11.5px; }
+.account-menu strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }.account-menu small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; color: var(--cocoa-600); font-size: 11.5px; }
 .account-menu__trigger > svg { width: 18px; height: 18px; flex: none; color: var(--cocoa-600); transition: transform .18s ease; }
 .account-menu__trigger[aria-expanded="true"] > svg { transform: rotate(180deg); }
-.account-menu__popover { position: absolute; right: 0; bottom: calc(100% + 10px); left: 0; z-index: 20; width: 100%; padding: 8px; border: 1px solid var(--sand-200); border-radius: 18px; background: var(--cream-50); box-shadow: var(--shadow-float); }
 .account-menu__backdrop { display: none; }
-.account-menu__identity { display: flex; align-items: center; gap: 11px; margin-bottom: 6px; padding: 10px; border-bottom: 1px solid var(--sand-100); }
-.account-menu__popover > button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 10px; color: var(--cocoa-800); background: transparent; font-weight: 700; cursor: pointer; }
-.account-menu__popover > button:hover, .account-menu__popover > button:focus-visible { background: var(--dorito-50); color: var(--dorito-700); }
 .account-menu__popover button svg { width: 20px; height: 20px; flex: none; }
-.account-menu__popover > .account-menu__logout { color: var(--danger-600); }
-.account-menu-enter-active, .account-menu-leave-active { transition: opacity .16s ease, transform .16s ease; transform-origin: bottom right; }
-.account-menu-enter-from, .account-menu-leave-to { opacity: 0; transform: translateY(5px) scale(.98); }
-.account-backdrop-enter-active, .account-backdrop-leave-active { transition: opacity .16s ease; }
-.account-backdrop-enter-from, .account-backdrop-leave-to { opacity: 0; }
+.account-menu-enter-active { transition: opacity .16s ease, transform .16s ease; transform-origin: bottom right; }
+.account-menu-leave-active { transition: opacity .16s ease, transform .16s ease; transform-origin: bottom right; }
+.account-menu-enter-from { opacity: 0; transform: translateY(5px) scale(.98); }
+.account-menu-leave-to { opacity: 0; transform: translateY(5px) scale(.98); }
+.account-backdrop-enter-active { transition: opacity .16s ease; }
+.account-backdrop-leave-active { transition: opacity .16s ease; }
+.account-backdrop-enter-from { opacity: 0; }
+.account-backdrop-leave-to { opacity: 0; }
 @media (max-width: 900px) {
   .account-menu__backdrop { position: fixed; inset: 0; z-index: 50; display: block; width: 100%; height: 100%; padding: 0; border: 0; background: rgba(36,29,25,.52); backdrop-filter: blur(2px); }
   .account-menu__popover { position: fixed; right: 12px; bottom: 12px; left: 12px; z-index: 51; width: auto; padding: 10px; border-radius: 22px; }
   .account-menu__popover > button { min-height: 50px; }
-  .account-menu-enter-active, .account-menu-leave-active { transform-origin: bottom center; }
+  .account-menu-enter-active { transform-origin: bottom center; }
+  .account-menu-leave-active { transform-origin: bottom center; }
 }
-@media (prefers-reduced-motion: reduce) { .account-menu__trigger > svg, .account-menu-enter-active, .account-menu-leave-active, .account-backdrop-enter-active, .account-backdrop-leave-active { transition: none; } }
 
 /* Neo-brutalist account control: compact and unmistakably interactive. */
-.account-menu__trigger { border: 2px solid transparent; border-radius: 9px; }
-.account-menu__trigger:hover, .account-menu__trigger[aria-expanded="true"] { border-color: var(--cocoa-950); background: var(--dorito-100); box-shadow: 3px 3px 0 var(--cocoa-950); }
-.account-menu__popover { padding: 9px; border: 2px solid var(--cocoa-950); border-radius: 10px; background: var(--cream-50); box-shadow: 5px 5px 0 var(--cocoa-950); }
-.account-menu__identity { border-bottom: 2px solid var(--cocoa-950); }
-.account-menu__popover > button { border: 2px solid transparent; border-radius: 7px; }
-.account-menu__popover > button:hover, .account-menu__popover > button:focus-visible { border-color: var(--cocoa-950); color: var(--cocoa-950); background: var(--lavender-100, #ece8ff); box-shadow: 2px 2px 0 var(--cocoa-950); }
+.account-menu__trigger { display: flex; align-items: center; gap: 10px; min-height: 48px; max-width: 260px; padding: 5px 8px 5px 6px; border: 2px solid transparent; border-radius: 9px; color: var(--cocoa-900); background: transparent; cursor: pointer; text-align: left; }
+.account-menu__trigger:hover { border-color: var(--cocoa-950); background: var(--dorito-100); box-shadow: 3px 3px 0 var(--cocoa-950); }
+.account-menu__trigger[aria-expanded="true"] { border-color: var(--cocoa-950); background: var(--dorito-100); box-shadow: 3px 3px 0 var(--cocoa-950); }
+.account-menu__popover { position: absolute; right: 0; bottom: calc(100% + 10px); left: 0; z-index: 20; width: 100%; padding: 9px; border: 2px solid var(--cocoa-950); border-radius: 10px; background: var(--cream-50); box-shadow: 5px 5px 0 var(--cocoa-950); }
+.account-menu__identity { display: flex; align-items: center; gap: 11px; margin-bottom: 6px; padding: 10px; border-bottom: 2px solid var(--cocoa-950); }
+.account-menu__popover > button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 12px; border: 2px solid transparent; border-radius: 7px; color: var(--cocoa-800); background: transparent; font-weight: 700; cursor: pointer; }
+.account-menu__popover > button:hover { background: var(--lavender-100, #ece8ff); color: var(--cocoa-950); border-color: var(--cocoa-950); box-shadow: 2px 2px 0 var(--cocoa-950); }
+.account-menu__popover > button:focus-visible { background: var(--lavender-100, #ece8ff); color: var(--cocoa-950); border-color: var(--cocoa-950); box-shadow: 2px 2px 0 var(--cocoa-950); }
 .account-menu__popover > .account-menu__logout { color: var(--danger-700, #874033); }
-.account-menu__popover > .account-menu__logout:hover, .account-menu__popover > .account-menu__logout:focus-visible { color: var(--danger-700, #874033); background: var(--danger-50, #fff0ec); }
-@media (prefers-reduced-motion: reduce) { .account-menu__trigger, .account-menu__popover > button { transition: none; } }
+.account-menu__popover > .account-menu__logout:hover { color: var(--danger-700, #874033); background: var(--danger-50, #fff0ec); }
+.account-menu__popover > .account-menu__logout:focus-visible { color: var(--danger-700, #874033); background: var(--danger-50, #fff0ec); }
+@media (prefers-reduced-motion: reduce) { .account-menu__trigger > svg { transition: none; } .account-menu-enter-active { transition: none; } .account-menu-leave-active { transition: none; } .account-backdrop-enter-active { transition: none; } .account-backdrop-leave-active { transition: none; } .account-menu__trigger { transition: none; } .account-menu__popover > button { transition: none; } }
 </style>

@@ -14,6 +14,23 @@ Antes de diseñar o modificar dominio, casos de uso, API, persistencia o integra
 
 No se permite reemplazar esta skill por una interpretación informal de DDD.
 
+## 1.1. Skill UI/UX obligatoria
+
+Antes de diseñar, revisar o modificar cualquier interfaz, experiencia de usuario, componente visual, layout, tipografía, color, responsive o animación, el agente DEBE:
+
+1. Leer completamente la skill `ui-ux-pro-max` disponible en:
+   `C:/Users/roman/.codex/skills/ui-ux-pro-max/SKILL.md`.
+2. Declarar en su actualización de trabajo que está utilizando esa skill y el bounded context de presentación afectado.
+3. Detectar el stack real del proyecto antes de consultar recomendaciones. Para este repositorio, el stack principal es Vue/Vite.
+4. Usar el buscador local de la skill con el modo más pequeño que corresponda:
+   - `--design-system` para una dirección visual de producto o sistema completo.
+   - `--domain` para una preocupación concreta de UX, accesibilidad, color, tipografía, iconos, movimiento o charts.
+   - `--stack vue` para recomendaciones específicas de implementación.
+5. Verificar antes de entregar: contraste, foco y teclado, objetivos táctiles, reflow sin scroll horizontal, zoom, estados de carga/error y `prefers-reduced-motion`.
+6. Tratar los resultados de la skill como recomendaciones subordinadas a estas reglas, a la arquitectura del repositorio y a la solicitud explícita del usuario. No persistir un nuevo design system ni introducir dependencias visuales sin autorización.
+
+La skill se aplica a cambios en `src/styles.css`, `src/App.vue`, `src/shared/`, vistas, componentes y cualquier otro archivo que cambie cómo se ve, se siente o se usa la aplicación. No amplía el alcance hacia backend, dominio, persistencia o APIs.
+
 ## 2. Un bounded context por agente
 
 Cada agente DEBE trabajar dentro de un único bounded context durante una tarea.

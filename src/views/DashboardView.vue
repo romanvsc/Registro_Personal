@@ -130,19 +130,49 @@ function setupDashboardMotion() {
         ]
         if (!targets.length) targets.push(section)
 
-        gsap.set(targets, { opacity: 0, y: 8 })
+        const shadowTargets = targets.filter((target) => {
+          const shadow = window.getComputedStyle(target).boxShadow
+          return shadow && shadow !== 'none'
+        })
+        const finalShadows = new Map(shadowTargets.map((target) => [target, window.getComputedStyle(target).boxShadow]))
+
+        // Keep the editorial irregularity in CSS: GSAP clears its temporary
+        // transform when the reveal finishes so card rotations remain intact.
+        gsap.set(targets, {
+          opacity: 0,
+          y: MOTION.offset.reveal,
+          rotation: (index) => (index % 2 ? -MOTION.rotation.reveal : MOTION.rotation.reveal),
+          scale: MOTION.scale.reveal,
+          transformOrigin: '50% 0%',
+        })
+        if (shadowTargets.length) {
+          gsap.set(shadowTargets, { boxShadow: '2px 2px 0 rgba(33, 25, 20, .72)' })
+        }
         ScrollTrigger.create({
           trigger: section,
           start: conditions.compact ? 'top 90%' : 'top 82%',
           once: true,
-          onEnter: () => gsap.to(targets, {
-            opacity: 1,
-            y: 0,
-            duration: MOTION.duration.reveal,
-            ease: MOTION.ease.standard,
-            stagger: MOTION.stagger,
-            overwrite: 'auto',
-          }),
+          onEnter: () => {
+            gsap.to(targets, {
+              opacity: 1,
+              y: 0,
+              rotation: 0,
+              scale: 1,
+              duration: MOTION.duration.reveal,
+              ease: MOTION.ease.standard,
+              stagger: MOTION.stagger,
+              overwrite: 'auto',
+              onComplete: () => gsap.set(targets, { clearProps: 'transform,opacity' }),
+            })
+            if (shadowTargets.length) gsap.to(shadowTargets, {
+              boxShadow: (_, target) => finalShadows.get(target),
+              duration: MOTION.duration.reveal,
+              ease: MOTION.ease.standard,
+              stagger: MOTION.stagger,
+              overwrite: 'auto',
+              onComplete: () => gsap.set(shadowTargets, { clearProps: 'boxShadow' }),
+            })
+          },
         })
       })
 
@@ -150,7 +180,12 @@ function setupDashboardMotion() {
       const bars = [...root.querySelectorAll('[data-motion-bar]')]
       if (!chart || !bars.length) return
 
-      gsap.set(bars, { opacity: 0.35, scaleY: 0.08, transformOrigin: 'bottom' })
+      gsap.set(bars, {
+        opacity: 0.35,
+        scaleY: 0.08,
+        rotation: (index) => (index % 2 ? -0.35 : 0.35),
+        transformOrigin: 'bottom',
+      })
       ScrollTrigger.create({
         trigger: chart,
         start: conditions.compact ? 'top 92%' : 'top 84%',
@@ -158,10 +193,12 @@ function setupDashboardMotion() {
         onEnter: () => gsap.to(bars, {
           opacity: 1,
           scaleY: 1,
-          duration: 0.42,
+          rotation: 0,
+          duration: MOTION.duration.reveal,
           ease: MOTION.ease.standard,
           stagger: MOTION.stagger,
           overwrite: 'auto',
+          onComplete: () => gsap.set(bars, { clearProps: 'transform,opacity' }),
         }),
       })
     },
@@ -219,20 +256,20 @@ const wellbeing = computed(() => [
     </header>
 
     <section class="hero-card" data-motion-section data-motion-reveal :class="{ 'is-empty': !totalEntries }">
-      <div v-if="hasSummary && totalEntries" data-motion-reveal>
-        <span class="soft-label">TU PROMEDIO</span><h2>{{ averageScore }} <small>/ 10</small></h2>
+      <div v-if="hasSummary && totalEntries" class="hero-card__content" data-motion-reveal>
+        <span class="soft-label hero-sticker">TU PROMEDIO</span><h2 class="hero-score"><span>{{ averageScore }}</span><small>/ 10</small></h2>
         <p>{{ catForInsight(averageScore).name }} dice que vas {{ averageScore >= 8 ? 'con toda' : averageScore >= 4 ? 'a tu ritmo' : 'con paciencia' }}. <span v-if="comparisonText" class="comparison-pill">{{ comparisonText }}</span></p>
         <RouterLink to="/historial">Ver evolución →</RouterLink>
       </div>
-      <div v-else-if="summaryError"><span class="soft-label">ESTADÍSTICAS</span><h2 class="empty-title">No pudimos cargar tus estadísticas</h2><button class="primary-button" type="button" @click="loadInsightSummary()">Reintentar</button></div>
-      <div v-else-if="loadingSummary" class="hero-loading" role="status">
+      <div v-else-if="summaryError" class="hero-card__content"><span class="soft-label hero-sticker">ESTADÍSTICAS</span><h2 class="empty-title">No pudimos cargar tus estadísticas</h2><button class="primary-button" type="button" @click="loadInsightSummary()">Reintentar</button></div>
+      <div v-else-if="loadingSummary" class="hero-card__content hero-loading" role="status">
         <span class="soft-label">ESTADÍSTICAS</span>
         <span class="visually-hidden">Calculando tu promedio…</span>
         <div class="skeleton skeleton--hero-title" aria-hidden="true"></div>
         <div class="skeleton skeleton--hero-copy" aria-hidden="true"></div>
         <div class="skeleton skeleton--hero-link" aria-hidden="true"></div>
       </div>
-      <div v-else><span class="soft-label">TODAVÍA NO HAY PROMEDIO</span><h2 class="empty-title">Sin registros todavía</h2><p>Felipa está esperando que le cuentes cómo viene tu día.</p><RouterLink v-if="firstEntryType" :to="`/registrar/${firstEntryType}`">Crear primer registro →</RouterLink></div>
+      <div v-else class="hero-card__content"><span class="soft-label hero-sticker">TODAVÍA NO HAY PROMEDIO</span><h2 class="empty-title">Sin registros todavía</h2><p>Felipa está esperando que le cuentes cómo viene tu día.</p><RouterLink v-if="firstEntryType" :to="`/registrar/${firstEntryType}`">Crear primer registro →</RouterLink></div>
       <img v-if="hasSummary && totalEntries" :src="catForInsight(averageScore).image" :alt="catForInsight(averageScore).name" />
       <img v-else :src="base + 'cats/felipa-molesta.png'" alt="Felipa esperando el primer registro" />
       <div v-if="totalEntries" class="scale-legend"><span>1</span><i></i><i></i><i></i><b></b><b></b><b></b><em></em><em></em><em></em><span>10</span></div>
@@ -313,31 +350,88 @@ const wellbeing = computed(() => [
 </template>
 
 <style scoped>
+.hero-card {
+  min-height: 300px;
+  margin-bottom: 54px;
+  padding: 38px 42px;
+  overflow: visible;
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  box-shadow: var(--neo-shadow-3);
+}
+
 .hero-card:not(.is-empty) {
   grid-template-columns: minmax(0, 1fr) 310px;
 }
 
 .hero-card:not(.is-empty) > img {
-  right: 34px;
-  bottom: -8px;
-  width: 315px;
-  height: 282px;
+  z-index: 3;
+  right: 26px;
+  bottom: -24px;
+  width: 340px;
+  height: 318px;
+  filter: drop-shadow(6px 6px 0 rgba(33, 25, 20, .26));
+  transform: translate(8px, 7px) rotate(1deg);
+  transform-origin: bottom center;
 }
 
-.dashboard-section {
+.hero-card.is-empty > img {
+  z-index: 3;
+  right: 30px;
+  bottom: -18px;
+  width: 286px;
+  height: 270px;
+  transform: translate(4px, 3px) rotate(-2deg);
+  transform-origin: bottom center;
+}
+
+.hero-card__content {
   position: relative;
-  margin-inline: -14px;
-  margin-bottom: 28px;
-  padding: 20px 14px 6px;
-  border: 1px solid var(--surface-border);
-  border-radius: 28px;
+  z-index: 2;
+  max-width: min(560px, 68%);
 }
 
-.dashboard-section--summary { background: color-mix(in srgb, var(--surface-hero) 52%, transparent); }
-.dashboard-section--trend { background: color-mix(in srgb, var(--surface-trend) 74%, transparent); }
-.dashboard-section--quick { background: color-mix(in srgb, var(--surface-quick) 70%, transparent); }
-.dashboard-section--wellbeing { background: color-mix(in srgb, var(--surface-wellbeing) 68%, transparent); }
-.dashboard-section--recent { background: color-mix(in srgb, var(--surface-recent) 66%, transparent); }
+.hero-sticker {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  padding: 4px 10px;
+  border: 2px solid var(--neo-ink);
+  border-radius: 5px;
+  background: var(--neo-butter);
+  box-shadow: 2px 2px 0 var(--neo-ink);
+  color: var(--neo-ink);
+  transform: rotate(-2deg);
+}
+
+.hero-score {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 16px 0 4px;
+}
+
+.hero-score > span {
+  color: var(--neo-orange-dark);
+  font: 800 clamp(72px, 8vw, 108px) / .86 var(--font-display);
+  letter-spacing: -.07em;
+}
+
+.hero-score small {
+  color: var(--neo-ink);
+  font-size: clamp(20px, 2.2vw, 29px);
+  font-weight: 800;
+  letter-spacing: -.04em;
+}
+
+.hero-card__content .empty-title {
+  max-width: 520px;
+  margin-top: 18px;
+  color: var(--neo-ink);
+  font-size: clamp(34px, 4.5vw, 58px);
+  letter-spacing: -.045em;
+  text-wrap: balance;
+}
 
 .dashboard-section .section-heading { position: relative; z-index: 1; }
 
@@ -345,9 +439,11 @@ const wellbeing = computed(() => [
   display: inline-block;
   margin-left: 6px;
   padding: 3px 10px;
+  border: 2px solid var(--neo-ink);
   border-radius: 999px;
-  background: var(--sage-100, #e3efe4);
-  color: var(--sage-700, #3f7a4a);
+  background: var(--neo-sage);
+  color: var(--neo-ink);
+  box-shadow: 2px 2px 0 var(--neo-ink);
   font-size: 12.5px;
   font-weight: 700;
 }
@@ -356,13 +452,6 @@ const wellbeing = computed(() => [
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 14px;
-}
-
-.summary-strip article {
-  padding: 18px 16px;
-  border: 1px solid var(--dorito-200, #e9c9a8);
-  border-radius: 14px;
-  background: var(--cream-50, #fffdf7);
 }
 
 .summary-strip span {
@@ -386,46 +475,39 @@ const wellbeing = computed(() => [
   font-size: 13.5px;
 }
 
-.trend-chart {
-  margin: 0;
-  padding: 18px 18px 14px;
-  border: 1px solid var(--dorito-200, #e9c9a8);
-  border-radius: 14px;
-  background: var(--cream-50, #fffdf7);
-}
-
 .trend-chart figcaption {
   margin-bottom: 14px;
   color: var(--cocoa-700);
   font-size: 13.5px;
 }
 
-.trend-chart__range,
-.trend-chart__summary,
-.trend-chart__hint {
+.trend-chart__range {
   margin: 0;
-  color: var(--cocoa-700);
+  color: var(--cocoa-800);
   font-size: 13px;
   line-height: 1.45;
-}
-
-.trend-chart__range {
   margin-bottom: 6px;
-  color: var(--cocoa-800);
   font-weight: 800;
 }
 
 .trend-chart__summary {
+  margin: 0;
+  color: var(--cocoa-700);
+  font-size: 13px;
+  line-height: 1.45;
   max-width: 720px;
   margin-bottom: 8px;
 }
 
 .trend-chart__hint {
+  margin: 0;
+  color: var(--cocoa-600);
+  font-size: 13px;
+  line-height: 1.45;
   display: flex;
   align-items: center;
   gap: 6px;
   margin-bottom: 10px;
-  color: var(--cocoa-600);
 }
 
 .trend-chart__hint span {
@@ -446,7 +528,7 @@ const wellbeing = computed(() => [
 }
 
 .trend-chart__viewport:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--dorito-500) 65%, white);
+  outline: 3px solid var(--neo-orange);
   outline-offset: 4px;
 }
 
@@ -498,17 +580,6 @@ const wellbeing = computed(() => [
   height: 110px;
 }
 
-.trend-chart__track i {
-  position: absolute;
-  right: 16%;
-  bottom: 0;
-  left: 16%;
-  min-height: 8px;
-  border-radius: 8px 8px 4px 4px;
-  background: linear-gradient(180deg, var(--dorito-300), var(--dorito-500));
-  transform-origin: bottom;
-}
-
 .trend-chart__bars time {
   align-self: end;
   overflow: hidden;
@@ -530,26 +601,26 @@ const wellbeing = computed(() => [
   place-items: center;
   width: 34px;
   height: 34px;
-  border: 1px solid var(--dorito-200);
+  border: 2px solid var(--neo-ink);
   border-radius: 50%;
-  background: var(--dorito-50);
-  color: var(--dorito-600);
+  background: var(--neo-paper);
+  color: var(--neo-ink);
   font-size: 21px;
   font-weight: 700;
   line-height: 1;
   transition: background-color .2s ease, color .2s ease, transform .2s ease;
 }
 
-.quick-card:hover > b,
-.quick-card:focus-visible > b {
-  background: var(--dorito-500);
-  color: white;
+.quick-card:hover > b {
+  background: var(--neo-orange);
+  color: var(--neo-ink);
   transform: scale(1.06);
 }
 
-.wellbeing-grid article {
-  min-height: 104px;
-  padding: 19px 16px;
+.quick-card:focus-visible > b {
+  background: var(--neo-orange);
+  color: var(--neo-ink);
+  transform: scale(1.06);
 }
 
 .wellbeing-grid {
@@ -564,34 +635,48 @@ const wellbeing = computed(() => [
   min-height: 32px;
   margin-top: 6px;
   padding: 0 10px;
-  border: 1px solid var(--dorito-300);
-  border-radius: 9px;
-  color: var(--dorito-700);
-  background: var(--dorito-50);
+  border: 2px solid var(--neo-ink);
+  border-radius: var(--neo-radius-sm);
+  color: var(--neo-ink);
+  background: var(--neo-paper);
   font-size: 12px;
   font-weight: 800;
   cursor: pointer;
 }
 
-.wellbeing-grid article button:hover,
+.wellbeing-grid article button:hover {
+  border-color: var(--neo-ink);
+  background: var(--neo-butter);
+}
+
 .wellbeing-grid article button:focus-visible {
-  border-color: var(--dorito-500);
-  background: var(--dorito-100);
+  border-color: var(--neo-ink);
+  background: var(--neo-butter);
 }
 
 .wellbeing-card__value { width: 72px; height: 22px; margin: 6px 0; }
 .wellbeing-card__detail { width: min(160px, 90%); height: 11px; }
 
-.entry-list article span,
-.entry-list article p,
-.entry-list-empty p,
-.wellbeing-grid small,
+.entry-list article span {
+  color: var(--cocoa-700);
+}
+
+.wellbeing-grid small {
+  color: var(--cocoa-700);
+}
+
 .wellbeing-grid p {
   color: var(--cocoa-700);
 }
 
-.entry-list article p,
+.entry-list article p {
+  color: var(--cocoa-700);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
 .entry-list-empty p {
+  color: var(--cocoa-700);
   font-size: 13.5px;
   line-height: 1.45;
 }
@@ -656,25 +741,244 @@ const wellbeing = computed(() => [
 .skeleton--score { width: 38px; height: 14px; }
 
 @keyframes insight-skeleton-pulse {
-  0%, 100% { opacity: .5; }
+  0% { opacity: .5; }
+  100% { opacity: .5; }
   50% { opacity: .92; }
 }
 
 @media (max-width: 900px) {
+  .hero-card {
+    overflow: hidden;
+  }
+
   .hero-card:not(.is-empty) {
     grid-template-columns: 1fr;
   }
 
   .hero-card:not(.is-empty) > img {
-    right: 10px;
+    right: 8px;
+    bottom: -18px;
+    width: 286px;
+    height: 270px;
+    opacity: .82;
   }
+
+  .dashboard-page {
+    display: block;
+  }
+
+  .dashboard-section--summary,
+  .dashboard-section--trend,
+  .dashboard-section--quick,
+  .dashboard-section--wellbeing,
+  .dashboard-section--recent {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+/* Editorial dashboard composition: one poster, then varied modules instead of a card stack. */
+.dashboard-section {
+  position: relative;
+  margin-inline: 0;
+  margin-bottom: 38px;
+  padding: 24px 24px 20px;
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  box-shadow: var(--neo-shadow-2);
+}
+
+.dashboard-section--summary {
+  width: min(82%, 760px);
+  background: var(--surface-hero);
+}
+
+.dashboard-section--trend {
+  width: 100%;
+  border-left-width: 10px;
+  background: var(--neo-lilac);
+}
+
+.dashboard-section--quick {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dashboard-section--wellbeing {
+  width: min(92%, 960px);
+  margin-left: auto;
+  border-right-width: 10px;
+  background: var(--neo-sage);
+}
+
+.dashboard-section--recent {
+  width: 100%;
+  background: var(--neo-paper);
+}
+
+.summary-strip article {
+  min-height: 132px;
+  padding: 22px 18px;
+  border: var(--neo-border);
+  border-radius: var(--neo-radius-sm);
+  background: var(--neo-paper);
+  box-shadow: var(--neo-shadow-1);
+}
+
+.summary-strip article:nth-child(2) {
+  margin-top: 18px;
+  background: var(--neo-butter);
+}
+
+.trend-chart {
+  margin: 0;
+  padding: 14px 0 8px;
+  border-top: var(--neo-border);
+  border-bottom: var(--neo-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.trend-chart--loading {
+  min-height: 190px;
+}
+
+.trend-chart__track i {
+  position: absolute;
+  right: 16%;
+  bottom: 0;
+  left: 16%;
+  min-height: 8px;
+  border-radius: 2px 2px 0 0;
+  background: var(--neo-orange);
+  transform-origin: bottom;
+}
+
+.quick-card {
+  min-height: 124px;
+  border: var(--neo-border);
+  border-left-width: 8px;
+  border-radius: var(--neo-radius-sm);
+  box-shadow: var(--neo-shadow-1);
+  background: var(--neo-butter);
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.quick-card:nth-child(2) {
+  min-height: 146px;
+  align-self: end;
+  border-left-color: var(--neo-ink);
+  background: var(--neo-lilac);
+}
+
+.quick-card:nth-child(3) {
+  min-height: 112px;
+  border-left-color: var(--neo-ink);
+  background: var(--neo-sage);
+}
+
+.quick-card:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--neo-shadow-2);
+}
+
+.quick-card:focus-visible {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--neo-shadow-2);
+}
+
+.wellbeing-grid article {
+  min-height: 122px;
+  padding: 20px 18px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.wellbeing-grid article + article {
+  border-left: 3px solid var(--neo-ink);
+  padding-left: 24px;
+}
+
+.wellbeing-grid article > span {
+  border: 2px solid var(--neo-ink);
+  border-radius: 50%;
+  background: var(--neo-paper);
+  box-shadow: 2px 2px 0 var(--neo-ink);
+}
+
+.entry-list {
+  border-top: var(--neo-border);
+  border-bottom: var(--neo-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.entry-list:not(.entry-list--loading) .entry-list__row {
+  position: relative;
+  padding-left: 28px;
+  background: var(--neo-paper);
+}
+
+.entry-list:not(.entry-list--loading) .entry-list__row::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 7px;
+  background: var(--entry-rail, var(--neo-orange));
+  content: '';
+}
+
+.entry-list article + article { border-top: 2px solid var(--neo-ink); }
+
+.entry-list-empty--insight {
+  border: var(--neo-border);
+  border-style: dashed;
+  border-radius: var(--neo-radius-sm);
+  background: var(--neo-paper);
+}
+
+.entry-list-empty {
+  position: relative;
+  min-height: 154px;
+  padding-right: 176px;
+  overflow: hidden;
+  border: var(--neo-border);
+  border-style: dashed;
+  border-radius: var(--neo-radius-sm);
+  background: var(--neo-paper);
+}
+
+.entry-list-empty > img {
+  position: absolute;
+  right: -12px;
+  bottom: -14px;
+  z-index: 0;
+  width: 154px;
+  height: 154px;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.entry-list-empty > div {
+  position: relative;
+  z-index: 1;
+  max-width: 52ch;
 }
 
 @media (max-width: 560px) {
-  .dashboard-section {
-    margin-inline: -8px;
-    padding: 18px 8px 4px;
-    border-radius: 24px;
+
+  .hero-card {
+    min-height: 310px;
+    margin-bottom: 42px;
+    padding: 24px 20px 20px;
+    overflow: hidden;
   }
 
   .hero-card:not(.is-empty) {
@@ -691,10 +995,14 @@ const wellbeing = computed(() => [
     grid-column: 2;
     grid-row: 1;
     align-self: end;
-    width: 132px;
-    height: 150px;
+    width: 146px;
+    height: 164px;
     opacity: 1;
-    transform: translateX(10px);
+    transform: translate(10px, 5px);
+  }
+
+  .hero-card__content {
+    max-width: none;
   }
 
   .hero-card:not(.is-empty) > div:first-child {
@@ -702,8 +1010,17 @@ const wellbeing = computed(() => [
     grid-row: 1;
   }
 
-  .hero-card:not(.is-empty) h2 {
-    font-size: 46px;
+  .hero-score {
+    gap: 7px;
+    margin-top: 14px;
+  }
+
+  .hero-score > span {
+    font-size: 58px;
+  }
+
+  .hero-score small {
+    font-size: 20px;
   }
 
   .hero-card:not(.is-empty) p {
@@ -723,8 +1040,16 @@ const wellbeing = computed(() => [
     margin-top: 16px;
   }
 
-  .hero-card:not(.is-empty) .scale-legend i,
-  .hero-card:not(.is-empty) .scale-legend b,
+  .hero-card:not(.is-empty) .scale-legend i {
+    flex: 1;
+    width: auto;
+  }
+
+  .hero-card:not(.is-empty) .scale-legend b {
+    flex: 1;
+    width: auto;
+  }
+
   .hero-card:not(.is-empty) .scale-legend em {
     flex: 1;
     width: auto;
@@ -750,10 +1075,6 @@ const wellbeing = computed(() => [
     font-size: 30px;
   }
 
-  .trend-chart {
-    padding-inline: 12px;
-  }
-
   .trend-chart__viewport {
     padding-bottom: 4px;
   }
@@ -762,111 +1083,197 @@ const wellbeing = computed(() => [
     min-width: max(100%, var(--trend-min-width));
   }
 
+  .summary-strip,
+  .quick-grid,
+  .wellbeing-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-section {
+    width: 100%;
+    margin-inline: 0;
+    margin-bottom: 30px;
+    padding: 18px 16px 16px;
+    border-radius: var(--neo-radius-sm);
+    box-shadow: var(--neo-shadow-1);
+  }
+
+  .entry-list-empty {
+    min-height: 136px;
+    padding-right: 118px;
+  }
+
+  .entry-list-empty > img {
+    right: -8px;
+    bottom: -10px;
+    width: 112px;
+    height: 112px;
+  }
+
+  .summary-strip article {
+    min-height: 112px;
+    padding: 18px 15px;
+    box-shadow: var(--neo-shadow-1);
+  }
+
+  .summary-strip article:nth-child(2) {
+    margin-top: 0;
+  }
+
+  .trend-chart {
+    padding-inline: 0;
+  }
+
+  .quick-card {
+    min-height: 112px;
+    box-shadow: var(--neo-shadow-1);
+  }
+
+  .quick-card:nth-child(2),
+  .quick-card:nth-child(3) {
+    min-height: 112px;
+  }
+
   .wellbeing-grid article {
     min-height: 92px;
     padding: 15px 14px;
   }
-}
 
-@media (prefers-reduced-motion: reduce) {
-  .skeleton {
-    animation: none;
-  }
-}
-/* Option 3: editorial blocks and type rails. Global tokens can override the fallbacks. */
-.dashboard-section {
-  border: 2px solid var(--neo-ink, var(--cocoa-900, #2b211d));
-  border-radius: 12px;
-  box-shadow: 4px 4px 0 var(--neo-ink, var(--cocoa-900, #2b211d));
-}
-
-.dashboard-section--summary { background: var(--neo-paper-warm, var(--surface-hero, #fff1df)); }
-.dashboard-section--trend { background: var(--neo-lavender-soft, var(--surface-trend, #f0edf8)); }
-.dashboard-section--quick { background: var(--neo-butter-soft, var(--surface-quick, #fff4d8)); }
-.dashboard-section--wellbeing { background: var(--neo-sage-soft, var(--surface-wellbeing, #eaf3e9)); }
-.dashboard-section--recent { background: var(--neo-paper, var(--surface-recent, #fffdf7)); }
-
-.summary-strip article,
-.trend-chart,
-.quick-card,
-.wellbeing-grid article,
-.entry-list {
-  border: 2px solid var(--neo-ink, var(--cocoa-900, #2b211d));
-  border-radius: 10px;
-  box-shadow: 3px 3px 0 var(--neo-ink, var(--cocoa-900, #2b211d));
-}
-
-.summary-strip article,
-.trend-chart,
-.entry-list { background: var(--neo-paper, var(--cream-50, #fffdf7)); }
-
-.summary-strip article { min-height: 112px; }
-
-.trend-chart { overflow: hidden; }
-.trend-chart__track i {
-  border-radius: 2px 2px 0 0;
-  background: var(--neo-lavender-strong, var(--dorito-500, #d97822));
-}
-
-.quick-card {
-  background: var(--neo-paper, var(--cream-50, #fffdf7));
-  transition: transform .2s ease, box-shadow .2s ease;
-}
-
-.quick-card:hover,
-.quick-card:focus-visible {
-  transform: translate(-2px, -2px);
-  box-shadow: 5px 5px 0 var(--neo-ink, var(--cocoa-900, #2b211d));
-}
-
-.wellbeing-grid article { background: var(--neo-paper, var(--cream-50, #fffdf7)); }
-
-.entry-list { overflow: hidden; }
-.entry-list:not(.entry-list--loading) .entry-list__row {
-  position: relative;
-  padding-left: 28px;
-  background: var(--neo-paper, var(--cream-50, #fffdf7));
-}
-
-.entry-list:not(.entry-list--loading) .entry-list__row::before {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 7px;
-  background: var(--entry-rail, var(--neo-orange-strong, #c45f16));
-  content: '';
-}
-
-.entry-list article + article { border-top: 2px solid var(--neo-ink-soft, var(--sand-100, #f1e6d8)); }
-
-.entry-list-empty--insight,
-.entry-list-empty {
-  border: 2px dashed var(--neo-ink, var(--cocoa-900, #2b211d));
-  border-radius: 10px;
-  background: var(--neo-paper, var(--cream-50, #fffdf7));
-}
-
-@media (max-width: 560px) {
-  .dashboard-section {
-    box-shadow: 3px 3px 0 var(--neo-ink, var(--cocoa-900, #2b211d));
+  .wellbeing-grid article + article {
+    border-top: 2px solid var(--neo-ink);
+    border-left: 0;
+    padding-left: 14px;
   }
 
-  .summary-strip article,
-  .trend-chart,
-  .quick-card,
-  .wellbeing-grid article,
   .entry-list {
-    box-shadow: 2px 2px 0 var(--neo-ink, var(--cocoa-900, #2b211d));
+    box-shadow: none;
   }
 
   .entry-list:not(.entry-list--loading) .entry-list__row { padding-left: 24px; }
 }
 
+@media (min-width: 901px) {
+  .dashboard-page {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: clamp(16px, 2vw, 28px);
+    align-items: start;
+  }
+
+  .dashboard-page > .page-header,
+  .dashboard-page > .hero-card,
+  .dashboard-page > .dashboard-section--quick {
+    grid-column: 1 / -1;
+  }
+
+  .dashboard-page > .dashboard-section--summary {
+    grid-column: 1 / span 5;
+    width: 100%;
+  }
+
+  .dashboard-page > .dashboard-section--trend {
+    grid-column: 6 / -1;
+    width: 100%;
+  }
+
+  .dashboard-page > .dashboard-section--wellbeing {
+    grid-column: 1 / span 7;
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .dashboard-page > .dashboard-section--recent {
+    grid-column: 8 / -1;
+    width: 100%;
+  }
+
+  .dashboard-section--summary .summary-strip {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .dashboard-section--summary .summary-strip article:first-child {
+    grid-column: span 2;
+  }
+
+  .dashboard-section--summary .summary-strip article:nth-child(2) {
+    grid-column: span 3;
+    transform: rotate(1deg);
+  }
+
+  .dashboard-section--quick .quick-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  .dashboard-section--quick .quick-card {
+    align-self: start;
+  }
+
+  .dashboard-section--quick .quick-card:nth-child(1) {
+    grid-column: span 5;
+  }
+
+  .dashboard-section--quick .quick-card:nth-child(2) {
+    grid-column: span 4;
+    transform: rotate(-.7deg);
+  }
+
+  .dashboard-section--quick .quick-card:nth-child(3) {
+    grid-column: span 3;
+    transform: rotate(.7deg);
+  }
+
+  .dashboard-section--quick .quick-card:nth-child(n + 4) {
+    grid-column: span 3;
+  }
+
+  .dashboard-section--quick .quick-card:nth-child(2):hover,
+  .dashboard-section--quick .quick-card:nth-child(2):focus-visible {
+    transform: translate(-2px, -2px) rotate(-.7deg);
+  }
+
+  .dashboard-section--quick .quick-card:nth-child(3):hover,
+  .dashboard-section--quick .quick-card:nth-child(3):focus-visible {
+    transform: translate(-2px, -2px) rotate(.7deg);
+  }
+
+  .dashboard-section--wellbeing .wellbeing-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0;
+  }
+
+  .dashboard-section--wellbeing .wellbeing-grid article:first-child {
+    grid-column: span 3;
+  }
+
+  .dashboard-section--wellbeing .wellbeing-grid article:nth-child(2) {
+    grid-column: span 2;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .quick-card,
-  .quick-card:hover,
+  .hero-card > img {
+    transform: none !important;
+  }
+
+  .skeleton {
+    animation: none;
+  }
+  .quick-card {
+    transform: none;
+    transition: none;
+  }
+  .quick-card:hover {
+    transform: none;
+    transition: none;
+  }
   .quick-card:focus-visible {
     transform: none;
     transition: none;
+  }
+  .summary-strip article:nth-child(2),
+  .quick-card:nth-child(2),
+  .quick-card:nth-child(3) {
+    transform: none !important;
   }
 }
 </style>

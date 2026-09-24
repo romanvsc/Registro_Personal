@@ -9,6 +9,7 @@ import AppVersion from './shared/components/AppVersion.vue'
 import AccountMenu from './contexts/identity-access/components/AccountMenu.vue'
 import { sessionStore } from './contexts/identity-access/application/sessionStore'
 import JournalNavigation from './contexts/personal-journal/components/JournalNavigation.vue'
+import MobileBottomNavigation from './contexts/personal-journal/components/MobileBottomNavigation.vue'
 import { MOTION, createMotionContext, prefersReducedMotion, gsap } from './shared/motion/gsap'
 
 const menuOpen = ref(false)
@@ -25,9 +26,10 @@ const recordPatternIcons = {
   animo: 'estado-animo.svg',
 }
 const recordTheme = computed(() => {
-  if (route.path.startsWith('/registrar/comida')) return 'records-theme--food'
-  if (route.path.startsWith('/registrar/entrenamiento')) return 'records-theme--training'
-  if (route.path.startsWith('/registrar/animo')) return 'records-theme--mood'
+  if (route.params.type === 'comida') return 'records-theme--food'
+  if (route.params.type === 'entrenamiento') return 'records-theme--training'
+  if (route.params.type === 'animo') return 'records-theme--mood'
+  if (route.path.startsWith('/registrar')) return 'records-theme--custom'
   return ''
 })
 const isDashboard = computed(() => route.path === '/')
@@ -45,10 +47,18 @@ function animateRouteEnter(element, done) {
   let context
   context = createMotionContext(element, () => {
     gsap.fromTo(element,
-      { opacity: 0, y: 6 },
+      {
+        opacity: 0,
+        y: MOTION.offset.routeEnter,
+        rotation: MOTION.rotation.routeEnter,
+        scale: MOTION.scale.routeEnter,
+        transformOrigin: '50% 0%',
+      },
       {
         opacity: 1,
         y: 0,
+        rotation: 0,
+        scale: 1,
         duration: MOTION.duration.route,
         ease: MOTION.ease.enter,
         onComplete: () => {
@@ -70,7 +80,9 @@ function animateRouteLeave(element, done) {
   context = createMotionContext(element, () => {
     gsap.to(element, {
       opacity: 0,
-      y: -4,
+      y: MOTION.offset.routeLeave,
+      rotation: MOTION.rotation.routeLeave,
+      scale: MOTION.scale.routeLeave,
       duration: MOTION.duration.route,
       ease: MOTION.ease.leave,
       onComplete: () => {
@@ -202,6 +214,7 @@ async function signOut() {
         </Transition>
       </RouterView>
     </main>
+    <MobileBottomNavigation v-if="!menuOpen" />
     <ToastHost />
   </div>
   <AppVersion />
